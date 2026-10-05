@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vault Central Maker — Master Control</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --card-hover: #1e293b;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --emerald: #10b981;
+      --emerald-bg: rgba(16, 185, 129, 0.12);
+      --rose: #f43f5e;
+      --rose-bg: rgba(244, 63, 94, 0.12);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.12);
+      --purple: #8b5cf6;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    /* Layout */
+    header {
+      background-color: var(--card-bg);
+      border-bottom: 1px solid var(--card-border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .logo-group {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .logo-badge {
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      color: white;
+      font-weight: 800;
+      font-size: 1.25rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 8px;
+      letter-spacing: 0.05em;
+    }
+    .logo-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .logo-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .key-badge {
+      background-color: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #93c5fd;
+      cursor: pointer;
+    }
+    .key-badge:hover {
+      background-color: rgba(59, 130, 246, 0.2);
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      color: var(--emerald);
+      background: var(--emerald-bg);
+      padding: 0.3rem 0.65rem;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    main {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 1.75rem 1.5rem;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+    .stat-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .stat-title {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin: 0.25rem 0;
+    }
+    .stat-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 0.75rem 1.25rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    /* Tab Content Panes */
+    .tab-pane {
+      display: none;
+    }
+    .tab-pane.active {
+      display: block;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards & Panels */
+    .panel {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .panel-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Forms */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .form-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .form-control {
+      background-color: var(--bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 0.65rem 0.85rem;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .form-control:focus {
+      border-color: var(--primary);
+    }
+    .btn {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 0.65rem 1.25rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: background-color 0.15s ease;
+    }
+    .btn:hover {
+      background-color: var(--primary-hover);
+    }
+    .btn-secondary {
+      background-color: #374151;
+    }
+    .btn-secondary:hover {
+      background-color: #4b5563;
+    }
+    .btn-sm {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+    th {
+      background-color: #1f2937;
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--card-border);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--card-border);
+      color: #e5e7eb;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tr:hover td {
+      background-color: var(--card-hover);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .badge-emerald { background: var(--emerald-bg); color: var(--emerald); }
+    .badge-rose { background: var(--rose-bg); color: var(--rose); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); }
+    .badge-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .badge-purple { background: rgba(139, 92, 246, 0.15); color: #c084fc; }
+
+    .code-text {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      background-color: rgba(0,0,0,0.3);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+
+    /* Alerts and Flash Cards */
+    .flash-box {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid var(--emerald);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+    .flash-box.visible {
+      display: block;
+    }
+
+    /* Verifier Box */
+    .verifier-card {
+      background: linear-gradient(180deg, #111827 0%, #172133 100%);
+      border: 1px solid #2563eb;
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .verif-result {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .verif-success {
+      background: var(--emerald-bg);
+      border: 1px solid var(--emerald);
+      color: #6ee7b7;
+    }
+    .verif-error {
+      background: var(--rose-bg);
+      border: 1px solid var(--rose);
+      color: #fca5a5;
+    }
+
+    /* Toast */
+    #toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 9999;
+    }
+    .toast {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      animation: slideIn 0.2s ease-out;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-group">
+      <div class="logo-badge">VAULT</div>
+      <div>
+        <div class="logo-title">Central Maker Console</div>
+        <div class="logo-subtitle">Zero-Trust Fleet Management & Audit Transparency Notary</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="key-badge" id="mgr-key-badge" title="Click to copy Manager Public Key">
+        <span>🔑 Manager PubKey:</span>
+        <span id="mgr-pubkey-display">Loading...</span>
+      </div>
+      <div class="status-indicator">
+        <span class="pulse-dot"></span>
+        <span id="system-status-text">MANAGER ONLINE</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="loadAllData()" title="Refresh Dashboard">🔄 Refresh</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Top Statistics Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-title">Enrolled Fleet Nodes</div>
+        <div class="stat-value" id="stat-devices">0</div>
+        <div class="stat-sub">Akshaya Hubs & Kiosks</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Registered Tenants / Cafés</div>
+        <div class="stat-value" id="stat-cafes">0</div>
+        <div class="stat-sub">Active Enterprise Centers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Notarized Log Receipts</div>
+        <div class="stat-value" id="stat-logs">0</div>
+        <div class="stat-sub">Tamper-Proof Audit Entries</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Published OTA Releases</div>
+        <div class="stat-value" id="stat-releases">0</div>
+        <div class="stat-sub">Cryptographically Signed Builds</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('fleet')">🖥️ Fleet Command</button>
+      <button class="tab-btn" onclick="switchTab('cafes')">🏢 Café Tenants</button>
+      <button class="tab-btn" onclick="switchTab('tokens')">🎟️ Enrollment Tokens</button>
+      <button class="tab-btn" onclick="switchTab('releases')">📦 Signed OTA Releases</button>
+      <button class="tab-btn" onclick="switchTab('transparency')">📜 Transparency Log & Verifier</button>
+    </nav>
+
+    <!-- Tab 1: Fleet Command -->
+    <section id="pane-fleet" class="tab-pane active">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">📡 Active Enrolled Nodes Across Akshaya Network</div>
+          <input type="text" id="fleet-search" class="form-control" style="max-width: 280px;" placeholder="Search by Café or Device ID..." oninput="filterFleetTable()">
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Device ID</th>
+                <th>Café Tenant</th>
+                <th>Role</th>
+                <th>Platform / OS</th>
+                <th>App Ver</th>
+                <th>Image Ver</th>
+                <th>Update Status</th>
+                <th>Last Heartbeat</th>
+              </tr>
+            </thead>
+            <tbody id="fleet-table-body">
+              <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading enrolled devices...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 2: Café Tenants -->
+    <section id="pane-cafes" class="tab-pane">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">➕ Register New Akshaya Center / Internet Café</div>
+        </div>
+        <form id="create-cafe-form" onsubmit="handleCreateCafe(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Center Name</label>
+              <input type="text" id="cafe-name" class="form-control" placeholder="e.g. Kottayam Akshaya Center" required>
+            </div>
+            <div class="form-group">
+              <label>Vanity Slug (Unique)</label>
+              <input type="text" id="cafe-slug" class="form-control" placeholder="e.g. kottayam1" required pattern="[a-zA-Z0-9_-]+">
+            </div>
+            <div class="form-group">
+              <label>Owner Email</label>
+              <input type="email" id="cafe-email" class="form-control" placeholder="admin@kottayam.akshaya.in" required>
+            </div>
+          </div>
+          <button type="submit" class="btn">Register Café Tenant</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🏢 Registered Centers</div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Center Name</th>
+                <th>Slug</th>
+                <th>Public Vanity URL</th>
+                <th>Owner Email</th>
+                <th>Created At</th>
+              </tr>
+            </thead>
+            <tbody id="cafes-table-body">
+              <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading cafes...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Enrollment Tokens -->
+    <section id="pane-tokens" class="tab-pane">
+      <div id="new-token-flash" class="flash-box">
+        <div style="font-weight: 700; color: #10b981; margin-bottom: 0.25rem;">✨ NEW ENROLLMENT TOKEN GENERATED</div>
+        <div style="font-size: 0.85rem; color: #d1fae5; margin-bottom: 0.75rem;">
+          Provide this single-use secret token to the kiosk operator. It is shown only once and authorizes zero-trust device bootstrapping.
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <input type="text" id="raw-token-box" class="form-control code-text" readonly style="flex: 1; background: #064e3b; color: #6ee7b7; font-weight: 700;">
+          <button class="btn btn-sm" onclick="copyTokenToClipboard()">📋 Copy Token</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🎟️ Issue Zero-Trust Enrollment Token</div>
+        </div>
+        <form id="issue-token-form" onsubmit="handleIssueToken(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Target Café</label>
+              <select id="token-cafe-select" class="form-control" required>
+                <option value="" disabled selected>Select Café...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Max Allowed Node Uses</label>
+              <input type="number" id="token-max-uses" class="form-control" value="1" min="1" max="100" required>
+            </div>
+            <div class="form-group">
+              <label>Token TTL (Hours)</label>
+              <input type="number" id="token-ttl" class="form-control" value="72" min="1" max="720" required>
+            </div>
+          </div>
+          <button type="submit" class="btn">Generate Cryptographic Token</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">📋 Issued Enrollment Tokens</div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Target Café</th>
+                <th>Token SHA-256 Hash</th>
+                <th>Usage</th>
+                <th>Expires</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="tokens-table-body">
+              <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading tokens...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Signed OTA Releases -->
+    <section id="pane-releases" class="tab-pane">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">🚀 Sign & Publish Signed OTA Security Update</div>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+          When a vulnerability is discovered, publish a new signed binary (.bin or image) patch here. Enrolled nodes will automatically receive it via signed heartbeat and activate the update.
+        </p>
+        <form id="publish-release-form" onsubmit="handlePublishRelease(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Release Version</label>
+              <input type="text" id="release-version" class="form-control" placeholder="e.g. 2.0.0" required pattern="^[0-9]+\.[0-9]+\.[0-9]+.*$">
+            </div>
+            <div class="form-group">
+              <label>Security Severity</label>
+              <select id="release-severity" class="form-control" required>
+                <option value="normal">Normal (Routine Feature/Fix)</option>
+                <option value="security">Security Patch (Urgent)</option>
+                <option value="critical">Critical Vulnerability (Immediate Obliteration/Patch)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>OS Image Artifact (.bin or image file)</label>
+              <input type="file" id="release-file" class="form-control" required>
+            </div>
+          </div>
+          <button type="submit" id="btn-publish-release" class="btn">Sign & Distribute Release</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">📦 Release Catalog</div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Severity</th>
+                <th>Artifact Name</th>
+                <th>Size</th>
+                <th>Artifact SHA-256</th>
+                <th>Published At</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="releases-table-body">
+              <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading releases...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 5: Transparency Log & Verifier -->
+    <section id="pane-transparency" class="tab-pane">
+      <!-- Public Dispute Tree-Hash Verifier -->
+      <div class="verifier-card">
+        <div class="panel-title" style="color: #60a5fa; margin-bottom: 0.5rem;">🔍 Public Notarization Dispute Verifier</div>
+        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 1rem;">
+          Any customer or third-party auditor holding a digital deposit receipt can independently verify against the Central Manager's append-only Merkle transparency log to prove that their file was notarized without tampering.
+        </p>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <input type="text" id="verify-tree-input" class="form-control code-text" style="flex: 1; min-width: 280px;" placeholder="Paste Tree Hash (64 hex characters) from customer receipt...">
+          <button class="btn" onclick="verifyTreeHash()">Verify Notarization</button>
+        </div>
+        <div id="verif-result-box" class="verif-result"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">📜 Append-Only Transparency Notary Log</div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Seq #</th>
+                <th>Café</th>
+                <th>Device ID</th>
+                <th>Domain-Separated Tree Hash</th>
+                <th>Entry Hash</th>
+                <th>Manager Sig</th>
+                <th>Notarized Timestamp</th>
+              </tr>
+            </thead>
+            <tbody id="log-table-body">
+              <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading transparency log...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast-container"></div>
+
+  <script>
+    let globalFleetData = [];
+    let managerPubKey = '';
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      loadManagerKey();
+      loadAllData();
+      setInterval(loadAllData, 12000); // Polling every 12 seconds
+    });
+
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+      toast.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.4s ease';
+        setTimeout(() => toast.remove(), 400);
+      }, 3500);
+    }
+
+    async function loadManagerKey() {
+      try {
+        const res = await fetch('/.well-known/vault-manager.json');
+        if (res.ok) {
+          const data = await res.json();
+          managerPubKey = data.manager_public_key;
+          const display = managerPubKey.length > 20 ? `${managerPubKey.slice(0, 10)}...${managerPubKey.slice(-8)}` : managerPubKey;
+          document.getElementById('mgr-pubkey-display').textContent = display;
+          document.getElementById('mgr-key-badge').onclick = () => {
+            navigator.clipboard.writeText(managerPubKey);
+            showToast('Manager Public Key copied to clipboard!', 'success');
+          };
+        }
+      } catch (err) {
+        console.error('Failed to load manager public key:', err);
+      }
+    }
+
+    async function loadAllData() {
+      await Promise.all([
+        loadFleetAndStats(),
+        loadTokens(),
+        loadReleases(),
+        loadTransparencyLog()
+      ]);
+    }
+
+    // Switch Tabs
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      const targetPane = document.getElementById(`pane-${tabId}`);
+      if (targetPane) targetPane.classList.add('active');
+    }
+
+    // Load Fleet, Cafes, and Stats
+    async function loadFleetAndStats() {
+      try {
+        const res = await fetch('/api/v1/admin/fleet');
+        if (!res.ok) throw new Error('Fleet fetch failed');
+        const data = await res.json();
+
+        // Update Stat Cards
+        document.getElementById('stat-devices').textContent = data.total_devices || 0;
+        document.getElementById('stat-cafes').textContent = data.total_cafes || 0;
+        document.getElementById('stat-logs').textContent = data.notarized_receipts_count || 0;
+
+        // Render Fleet Table
+        globalFleetData = data.devices || [];
+        renderFleetTable(globalFleetData);
+
+        // Render Cafes Table & Populate Token Dropdown
+        renderCafesTable(data.cafes || []);
+      } catch (err) {
+        console.error('Fleet error:', err);
+      }
+    }
+
+    function renderFleetTable(devices) {
+      const tbody = document.getElementById('fleet-table-body');
+      if (!devices || devices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No devices currently enrolled. Issue an enrollment token to onboard a node.</td></tr>';
+        return;
+      }
+
+      const now = Date.now() / 1000;
+      tbody.innerHTML = devices.map(d => {
+        const isOnline = d.last_seen && (now - d.last_seen < 180);
+        const lastSeenFormatted = d.last_seen ? new Date(d.last_seen * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : 'Never';
+
+        let statusBadge = '<span class="badge badge-emerald">Up to Date</span>';
+        if (d.update_status === 'downloading') {
+          statusBadge = '<span class="badge badge-blue">Downloading</span>';
+        } else if (d.update_status === 'applied') {
+          statusBadge = '<span class="badge badge-purple">Update Applied</span>';
+        } else if (d.update_status === 'failed') {
+          statusBadge = '<span class="badge badge-rose">Update Failed</span>';
+        }
+
+        const onlineTag = isOnline
+          ? '<span style="color: var(--emerald); font-weight: 600;">● Online</span>'
+          : '<span style="color: var(--text-muted);">○ Offline</span>';
+
+        return `
+          <tr>
+            <td><span class="code-text" title="${d.id}">${d.id.slice(0, 8)}...</span></td>
+            <td><strong>${escapeHtml(d.cafe_slug)}</strong></td>
+            <td><span class="badge badge-blue">${escapeHtml(d.role)}</span></td>
+            <td><span style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(d.os || 'Linux')}</span></td>
+            <td>${escapeHtml(d.app_version || '1.0.0')}</td>
+            <td><strong>${escapeHtml(d.image_version || '1.0.0')}</strong></td>
+            <td>${statusBadge}</td>
+            <td>${onlineTag} <span style="font-size: 0.75rem; color: var(--text-muted);">(${lastSeenFormatted})</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterFleetTable() {
+      const query = document.getElementById('fleet-search').value.toLowerCase().trim();
+      if (!query) {
+        renderFleetTable(globalFleetData);
+        return;
+      }
+      const filtered = globalFleetData.filter(d =>
+        (d.cafe_slug && d.cafe_slug.toLowerCase().includes(query)) ||
+        (d.id && d.id.toLowerCase().includes(query))
+      );
+      renderFleetTable(filtered);
+    }
+
+    function renderCafesTable(cafes) {
+      const tbody = document.getElementById('cafes-table-body');
+      const select = document.getElementById('token-cafe-select');
+      const currentSelected = select.value;
+
+      if (!cafes || cafes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No cafes registered yet.</td></tr>';
+        select.innerHTML = '<option value="" disabled selected>No cafes found</option>';
+        return;
+      }
+
+      tbody.innerHTML = cafes.map(c => `
+        <tr>
+          <td><strong>${escapeHtml(c.name)}</strong></td>
+          <td><span class="code-text">${escapeHtml(c.slug)}</span></td>
+          <td><a href="https://vault.laddu.cc/${escapeHtml(c.slug)}" target="_blank" style="color: #60a5fa; text-decoration: none;">vault.laddu.cc/${escapeHtml(c.slug)} ↗</a></td>
+          <td>${escapeHtml(c.owner_email)}</td>
+          <td>${new Date(c.created_at * 1000).toLocaleDateString()}</td>
+        </tr>
+      `).join('');
+
+      // Populate select dropdown
+      select.innerHTML = '<option value="" disabled>Select Café...</option>' +
+        cafes.map(c => `<option value="${escapeHtml(c.slug)}" ${c.slug === currentSelected ? 'selected' : ''}>${escapeHtml(c.name)} (${escapeHtml(c.slug)})</option>`).join('');
+    }
+
+    async function handleCreateCafe(e) {
+      e.preventDefault();
+      const name = document.getElementById('cafe-name').value.trim();
+      const slug = document.getElementById('cafe-slug').value.trim().toLowerCase();
+      const email = document.getElementById('cafe-email').value.trim();
+
+      try {
+        const res = await fetch('/api/v1/admin/cafes', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name, slug, email})
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Failed to create café');
+        }
+        showToast(`Café '${name}' created successfully!`, 'success');
+        document.getElementById('create-cafe-form').reset();
+        loadFleetAndStats();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // Load & Handle Tokens
+    async function loadTokens() {
+      try {
+        const res = await fetch('/api/v1/admin/tokens');
+        if (!res.ok) return;
+        const tokens = await res.json();
+        const tbody = document.getElementById('tokens-table-body');
+        if (!tokens || tokens.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No tokens issued yet.</td></tr>';
+          return;
+        }
+
+        const now = Date.now() / 1000;
+        tbody.innerHTML = tokens.map(t => {
+          const isExpired = t.expires_at < now;
+          const isExhausted = t.used_count >= t.max_uses;
+          let statusBadge = '<span class="badge badge-emerald">Active</span>';
+          if (isExhausted) statusBadge = '<span class="badge badge-purple">Used</span>';
+          else if (isExpired) statusBadge = '<span class="badge badge-rose">Expired</span>';
+
+          return `
+            <tr>
+              <td><strong>${escapeHtml(t.cafe_slug)}</strong></td>
+              <td><span class="code-text" title="${t.token_hash}">${t.token_hash.slice(0, 16)}...</span></td>
+              <td>${t.used_count} / ${t.max_uses}</td>
+              <td>${new Date(t.expires_at * 1000).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</td>
+              <td>${statusBadge}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Tokens error:', err);
+      }
+    }
+
+    async function handleIssueToken(e) {
+      e.preventDefault();
+      const cafe_slug = document.getElementById('token-cafe-select').value;
+      const max_uses = parseInt(document.getElementById('token-max-uses').value, 10);
+      const ttl_hours = parseInt(document.getElementById('token-ttl').value, 10);
+
+      try {
+        const res = await fetch('/api/v1/admin/tokens', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({cafe_slug, max_uses, ttl_hours})
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Token issuance failed');
+        }
+        const data = await res.json();
+        document.getElementById('raw-token-box').value = data.token;
+        document.getElementById('new-token-flash').classList.add('visible');
+        showToast('Enrollment token issued!', 'success');
+        loadTokens();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function copyTokenToClipboard() {
+      const box = document.getElementById('raw-token-box');
+      box.select();
+      navigator.clipboard.writeText(box.value);
+      showToast('Enrollment token copied!', 'success');
+    }
+
+    // Load & Handle Releases
+    async function loadReleases() {
+      try {
+        const res = await fetch('/api/v1/admin/releases');
+        if (!res.ok) return;
+        const releases = await res.json();
+        document.getElementById('stat-releases').textContent = releases.length;
+
+        const tbody = document.getElementById('releases-table-body');
+        if (!releases || releases.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No releases published yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = releases.map(r => {
+          const art = (r.manifest && r.manifest.artifacts && r.manifest.artifacts[0]) || {};
+          const sizeKb = art.size ? (art.size / 1024).toFixed(1) + ' KB' : 'N/A';
+          const sevClass = r.severity === 'critical' ? 'badge-rose' : r.severity === 'security' ? 'badge-amber' : 'badge-blue';
+
+          return `
+            <tr>
+              <td><strong>${escapeHtml(r.version)}</strong></td>
+              <td><span class="badge ${sevClass}">${escapeHtml(r.severity)}</span></td>
+              <td>${escapeHtml(art.name || 'none')}</td>
+              <td>${sizeKb}</td>
+              <td><span class="code-text" title="${art.sha256 || ''}">${(art.sha256 || 'N/A').slice(0, 16)}...</span></td>
+              <td>${new Date(r.published_at * 1000).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</td>
+              <td>
+                ${art.url ? `<a href="${art.url}" class="btn btn-secondary btn-sm" download>⬇️ Download</a>` : '<span style="color:var(--text-muted);">None</span>'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Releases error:', err);
+      }
+    }
+
+    async function handlePublishRelease(e) {
+      e.preventDefault();
+      const version = document.getElementById('release-version').value.trim();
+      const severity = document.getElementById('release-severity').value;
+      const fileInput = document.getElementById('release-file');
+      if (!fileInput.files || fileInput.files.length === 0) {
+        showToast('Please select a .bin or image file', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-publish-release');
+      btn.disabled = true;
+      btn.textContent = 'Publishing & Signing...';
+
+      const formData = new FormData();
+      formData.append('version', version);
+      formData.append('severity', severity);
+      formData.append('file', fileInput.files[0]);
+
+      try {
+        const res = await fetch('/api/v1/admin/releases/upload', {
+          method: 'POST',
+          body: formData
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Failed to publish release');
+        }
+        showToast(`OTA Release ${version} published and cryptographically signed!`, 'success');
+        document.getElementById('publish-release-form').reset();
+        loadReleases();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sign & Distribute Release';
+      }
+    }
+
+    // Load Transparency Log
+    async function loadTransparencyLog() {
+      try {
+        const res = await fetch('/api/v1/log/recent?limit=25');
+        if (!res.ok) return;
+        const entries = await res.json();
+        const tbody = document.getElementById('log-table-body');
+        if (!entries || entries.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No entries in transparency log yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = entries.map(e => {
+          let receipt = {};
+          try { receipt = JSON.parse(e.entry_json); } catch(ex){}
+          const treeHash = receipt.tree_hash || 'N/A';
+
+          return `
+            <tr>
+              <td><strong>#${e.seq}</strong></td>
+              <td>${escapeHtml(e.cafe_slug)}</td>
+              <td><span class="code-text">${(e.device_id || '').slice(0, 8)}...</span></td>
+              <td><span class="code-text" style="color: #60a5fa;" title="${treeHash}">${treeHash.slice(0, 16)}...</span></td>
+              <td><span class="code-text" title="${e.entry_hash}">${(e.entry_hash || '').slice(0, 12)}...</span></td>
+              <td><span class="code-text" title="${e.manager_sig}">${(e.manager_sig || '').slice(0, 12)}...</span></td>
+              <td>${new Date(e.created_at * 1000).toLocaleTimeString()}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Transparency log error:', err);
+      }
+    }
+
+    // Verify Tree Hash
+    async function verifyTreeHash() {
+      const treeHash = document.getElementById('verify-tree-input').value.trim();
+      const resultBox = document.getElementById('verif-result-box');
+      resultBox.style.display = 'block';
+
+      if (!treeHash || treeHash.length < 32) {
+        resultBox.className = 'verif-result verif-error';
+        resultBox.innerHTML = '❌ Please enter a valid SHA-256 tree hash (64 hex characters).';
+        return;
+      }
+
+      resultBox.className = 'verif-result';
+      resultBox.style.background = '#1e293b';
+      resultBox.style.color = '#e2e8f0';
+      resultBox.innerHTML = '⏳ Querying Central Transparency Notary...';
+
+      try {
+        const res = await fetch(`/api/v1/log/verify/${encodeURIComponent(treeHash)}`);
+        if (!res.ok) throw new Error('Verification query failed');
+        const data = await res.json();
+
+        if (data.found) {
+          resultBox.className = 'verif-result verif-success';
+          resultBox.innerHTML = `
+            <div style="font-weight: 700; margin-bottom: 0.25rem;">🛡️ VERIFIED AUTHENTIC NOTARIZATION</div>
+            <div style="font-size: 0.85rem; line-height: 1.6;">
+              This deposit receipt is authenticated on the Central Notary at <strong>Sequence #${data.seq}</strong>.<br>
+              <strong>Notarized At:</strong> ${new Date(data.logged_at * 1000).toLocaleString()}<br>
+              <strong>Café Origin:</strong> ${escapeHtml(data.receipt.cafe_slug)}<br>
+              <strong>File Size:</strong> ${(data.receipt.size / 1024).toFixed(1)} KB (${data.receipt.size} bytes)<br>
+              <strong>Merkle Tree Hash:</strong> <span class="code-text">${escapeHtml(data.receipt.tree_hash)}</span><br>
+              <strong>Log Entry Hash:</strong> <span class="code-text">${escapeHtml(data.entry_hash)}</span>
+            </div>
+          `;
+        } else {
+          resultBox.className = 'verif-result verif-error';
+          resultBox.innerHTML = `
+            <div style="font-weight: 700; margin-bottom: 0.25rem;">⚠️ UNVERIFIED OR FORGED TREE HASH</div>
+            <div style="font-size: 0.85rem;">
+              No notarized deposit receipt matching this Tree Hash was found in the Central Notary log.<br>
+              Either this file was never notarized, or the receipt data has been tampered with.
+            </div>
+          `;
+        }
+      } catch (err) {
+        resultBox.className = 'verif-result verif-error';
+        resultBox.innerHTML = `❌ Verification error: ${escapeHtml(err.message)}`;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

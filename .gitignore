@@ -1,0 +1,34 @@
+# Databases & Runtime Data (contains private keys, token hashes, user password hashes)
+*.db
+*.sqlite
+*.sqlite3
+data_server/
+manager_releases/
+
+# Generated Binary Firmware / Patch Releases
+*.bin
+*.exe
+*.dll
+*.so
+
+# Secrets & Environment Variables
+.env
+.env.*
+*.pem
+*.key
+
+# Python Virtual Environments & Caches
+.venv/
+venv/
+ENV/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# OS & IDE Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

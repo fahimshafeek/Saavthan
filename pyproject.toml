@@ -1,0 +1,16 @@
+[project]
+name = "hackathena"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "argon2-cffi>=25.1.0",
+    "cryptography>=50.0.2",
+    "fastapi>=0.142.2",
+    "httpx>=0.28.1",
+    "pydantic>=2.13.5",
+    "pynacl>=1.6.2",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "python-multipart>=0.0.32",
+    "uvicorn>=0.54.0",
+]

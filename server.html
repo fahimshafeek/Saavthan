@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vault — Privacy Kiosk Hub & Secure Portal</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --card-hover: #1e293b;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --emerald: #10b981;
+      --emerald-bg: rgba(16, 185, 129, 0.12);
+      --rose: #f43f5e;
+      --rose-hover: #e11d48;
+      --rose-bg: rgba(244, 63, 94, 0.12);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.12);
+      --purple: #8b5cf6;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    /* Layout */
+    header {
+      background-color: var(--card-bg);
+      border-bottom: 1px solid var(--card-border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .logo-group {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .logo-badge {
+      background: linear-gradient(135deg, #10b981, #3b82f6);
+      color: white;
+      font-weight: 800;
+      font-size: 1.25rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 8px;
+      letter-spacing: 0.05em;
+    }
+    .logo-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+    .logo-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      color: var(--emerald);
+      background: var(--emerald-bg);
+      padding: 0.3rem 0.65rem;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* Auth Screens */
+    .auth-container {
+      max-width: 440px;
+      margin: 4rem auto;
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 2.25rem;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .auth-header {
+      text-align: center;
+      margin-bottom: 1.75rem;
+    }
+    .auth-header h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+    .auth-header p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    /* Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 0.75rem 1.25rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+    .tab-btn.active {
+      color: var(--emerald);
+      border-bottom-color: var(--emerald);
+    }
+
+    /* Tab Panes */
+    .tab-pane {
+      display: none;
+    }
+    .tab-pane.active {
+      display: block;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Panels & Cards */
+    .panel {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .panel-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Node Status Banner */
+    .node-banner {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .node-meta {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .meta-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .meta-value {
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: #e5e7eb;
+    }
+
+    /* Forms & Controls */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .form-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .form-control {
+      background-color: var(--bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 0.65rem 0.85rem;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .form-control:focus {
+      border-color: var(--primary);
+    }
+    .btn {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 0.65rem 1.25rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover {
+      background-color: var(--primary-hover);
+    }
+    .btn-emerald {
+      background-color: var(--emerald);
+    }
+    .btn-emerald:hover {
+      background-color: #059669;
+    }
+    .btn-rose {
+      background-color: var(--rose);
+    }
+    .btn-rose:hover {
+      background-color: var(--rose-hover);
+    }
+    .btn-secondary {
+      background-color: #374151;
+    }
+    .btn-secondary:hover {
+      background-color: #4b5563;
+    }
+    .btn-sm {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
+    }
+    .btn-lg {
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+    th {
+      background-color: #1f2937;
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--card-border);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--card-border);
+      color: #e5e7eb;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tr:hover td {
+      background-color: var(--card-hover);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .badge-emerald { background: var(--emerald-bg); color: var(--emerald); }
+    .badge-rose { background: var(--rose-bg); color: var(--rose); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); }
+    .badge-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .badge-purple { background: rgba(139, 92, 246, 0.15); color: #c084fc; }
+
+    .code-text {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      background-color: rgba(0,0,0,0.3);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+
+    /* Obliteration Card */
+    .obliterate-box {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.1) 0%, rgba(17, 24, 39, 1) 100%);
+      border: 2px solid var(--rose);
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+      margin-top: 1.5rem;
+    }
+
+    /* Customer Portal Specific */
+    .drop-hero {
+      text-align: center;
+      max-width: 680px;
+      margin: 1.5rem auto 2.5rem;
+    }
+    .drop-hero h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #10b981, #60a5fa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .drop-hero p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .dropzone {
+      border: 2px dashed #374151;
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+      background: rgba(17, 24, 39, 0.6);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 1.5rem;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--emerald);
+      background: rgba(16, 185, 129, 0.05);
+    }
+    .dropzone-icon {
+      font-size: 3rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .progress-bar-container {
+      background-color: #1f2937;
+      border-radius: 9999px;
+      height: 12px;
+      overflow: hidden;
+      margin: 1rem 0;
+      display: none;
+    }
+    .progress-bar-fill {
+      background: linear-gradient(90deg, #10b981, #3b82f6);
+      height: 100%;
+      width: 0%;
+      transition: width 0.15s ease;
+    }
+
+    .receipt-card {
+      background: #0f2027;
+      background: linear-gradient(to bottom, #111e2e, #111827);
+      border: 1px solid var(--emerald);
+      border-radius: 12px;
+      padding: 1.75rem;
+      margin-top: 1.5rem;
+      display: none;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-backdrop.open {
+      display: flex;
+    }
+    .modal-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    }
+
+    /* Toast */
+    #toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 9999;
+    }
+    .toast {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      animation: slideIn 0.2s ease-out;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <header>
+    <div class="logo-group">
+      <div class="logo-badge">VAULT</div>
+      <div>
+        <div class="logo-title" id="app-header-title">Privacy Hub & Kiosk Agent</div>
+        <div class="logo-subtitle" id="app-header-subtitle">Zero-Retention Ephemeral Workspace</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="status-badge">
+        <span class="pulse-dot"></span>
+        <span id="node-online-status">HUB ONLINE</span>
+      </div>
+      <div id="staff-user-badge" style="display: none; align-items: center; gap: 0.75rem;">
+        <span style="font-size: 0.85rem; color: #9ca3af;">Staff: <strong id="staff-name-display" style="color: var(--text-main);"></strong></span>
+        <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Log Out</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Root Container -->
+  <main id="main-content">
+    <!-- View 1: Customer Portal View (Auto-loaded if URL is /p/{code}) -->
+    <section id="view-customer-portal" style="display: none;">
+      <div class="drop-hero">
+        <div class="badge badge-emerald" style="margin-bottom: 0.75rem;">🔒 Zero-Retention Client Drop</div>
+        <h1 id="portal-drop-title">Secure Document Drop</h1>
+        <p id="portal-drop-subtitle">Files uploaded here are encrypted with AES-256-GCM chunks and obliterated upon kiosk processing.</p>
+        <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 1rem; font-size: 0.85rem; color: var(--text-muted);">
+          <span>Max File Size: <strong id="portal-max-size" style="color: var(--text-main);">100 MB</strong></span>
+          <span>•</span>
+          <span id="portal-timer-badge">Expires in: <strong id="portal-countdown" style="color: #60a5fa;">--:--</strong></span>
+        </div>
+      </div>
+
+      <div class="panel" style="max-width: 680px; margin: 0 auto;">
+        <div id="portal-dropzone" class="dropzone" onclick="document.getElementById('file-upload-input').click()">
+          <div class="dropzone-icon">📁</div>
+          <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem;">Click to select file or drag & drop</div>
+          <div style="font-size: 0.85rem; color: var(--text-muted);">Documents, PDFs, Images, Archives (Up to drop limit)</div>
+          <input type="file" id="file-upload-input" style="display: none;" onchange="handleFileSelected(event)">
+        </div>
+
+        <div id="selected-file-info" style="display: none; margin-bottom: 1.25rem; background: #1e293b; padding: 1rem; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 700;" id="file-name-display">filename.pdf</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);" id="file-size-display">0 bytes • 1 chunk</div>
+            </div>
+            <button class="btn btn-emerald" id="btn-start-upload" onclick="startChunkedUpload()">🚀 Upload & Crypto-Seal</button>
+          </div>
+        </div>
+
+        <div id="upload-progress-container" class="progress-bar-container">
+          <div id="upload-progress-fill" class="progress-bar-fill"></div>
+        </div>
+        <div id="upload-status-text" style="text-align: center; font-size: 0.85rem; color: var(--text-muted); display: none;"></div>
+
+        <!-- Receipt Card -->
+        <div id="portal-receipt-card" class="receipt-card">
+          <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--emerald); font-weight: 700; font-size: 1.1rem; margin-bottom: 0.5rem;">
+            <span>🛡️ DEPOSIT RECEIPT NOTARIZED</span>
+          </div>
+          <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 1rem;">
+            Your file has been accepted, verified against its cryptographic tree hash, and notarized into the Central Manager Transparency Log.
+          </p>
+          <div style="font-size: 0.82rem; line-height: 1.7; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 6px; margin-bottom: 1.25rem;">
+            <div><strong>Upload ID:</strong> <span class="code-text" id="receipt-upload-id"></span></div>
+            <div><strong>Tree Hash (SHA-256):</strong> <span class="code-text" id="receipt-tree-hash" style="color: #60a5fa;"></span></div>
+            <div><strong>Hub Ed25519 Signature:</strong> <span class="code-text" id="receipt-hub-sig"></span></div>
+            <div><strong>Central Notary Ack Seq:</strong> <span class="badge badge-emerald" id="receipt-ack-seq">#--</span></div>
+            <div><strong>Timestamp:</strong> <span id="receipt-timestamp"></span></div>
+          </div>
+          <div style="display: flex; gap: 0.75rem;">
+            <button class="btn btn-secondary btn-sm" onclick="downloadReceiptFile()">⬇️ Download Receipt (.json)</button>
+            <button class="btn btn-emerald btn-sm" onclick="resetPortalView()">Upload Another Document</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 2: Authentication / Lockout Screen -->
+    <section id="view-auth" style="display: none;">
+      <div class="auth-container">
+        <div class="auth-header">
+          <div class="logo-badge" style="display: inline-block; margin-bottom: 0.75rem;">VAULT</div>
+          <h2 id="auth-title">Staff Authentication</h2>
+          <p id="auth-subtitle">Log in to manage drops and kiosk obliteration</p>
+        </div>
+
+        <!-- Mode Switcher Tabs: Sign In / Sign Up -->
+        <div id="auth-mode-switch" style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; background: #1f2937; padding: 0.25rem; border-radius: 8px;">
+          <button type="button" id="tab-auth-login" class="btn btn-sm" style="flex: 1; background: var(--primary);" onclick="setAuthMode('login')">Sign In</button>
+          <button type="button" id="tab-auth-register" class="btn btn-sm" style="flex: 1; background: transparent; color: var(--text-muted);" onclick="setAuthMode('register')">Sign Up (New Staff)</button>
+        </div>
+
+        <!-- Lockout Notice Banner -->
+        <div id="lockout-banner" style="display: none; background: var(--rose-bg); border: 1px solid var(--rose); color: #fca5a5; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.875rem;">
+          <div style="font-weight: 700; margin-bottom: 0.25rem;">🔒 ACCOUNT TEMPORARILY LOCKED</div>
+          <div>Too many consecutive failed attempts. Please wait <strong id="lockout-countdown">--</strong> seconds before retrying.</div>
+        </div>
+
+        <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label>Username</label>
+            <input type="text" id="auth-username" class="form-control" required autocomplete="username" placeholder="Username (min 3 chars)">
+          </div>
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label>Password (Argon2id)</label>
+            <input type="password" id="auth-password" class="form-control" required autocomplete="current-password" placeholder="Password (min 6 chars)">
+          </div>
+          <button type="submit" id="btn-auth-submit" class="btn" style="width: 100%;">Sign In</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- View 3: Staff Admin Console -->
+    <section id="view-staff-console" style="display: none;">
+      <!-- Node Identity & Cloudflare Vanity Endpoint Status Banner -->
+      <div class="node-banner">
+        <div class="node-meta">
+          <div class="meta-item">
+            <span class="meta-label">Assigned Café Slug</span>
+            <span class="meta-value" id="node-slug-display" style="color: #60a5fa;">local</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Device ID</span>
+            <span class="meta-value" id="node-device-display">Not Enrolled</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Active Image</span>
+            <span class="meta-value" id="node-image-display">base_image.bin (v1.0.0)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Public Cloudflare Vanity Portal</span>
+            <span class="meta-value" id="node-vanity-display">vault.laddu.cc/local</span>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="openEnrollModal()">🌐 Enroll / Link to Manager</button>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="tabs-nav">
+        <button class="tab-btn active" onclick="switchStaffTab('drops')">📫 Customer Drops</button>
+        <button class="tab-btn" onclick="switchStaffTab('uploads')">📥 Verified Uploads</button>
+        <button class="tab-btn" onclick="switchStaffTab('session')">🖥️ Kiosk Session & Obliteration</button>
+        <button class="tab-btn" onclick="switchStaffTab('ota')">🔄 Signed OTA Updater</button>
+        <button class="tab-btn" onclick="switchStaffTab('team')">👥 Staff Team</button>
+      </nav>
+
+      <!-- Staff Tab 1: Customer Drops -->
+      <section id="staff-pane-drops" class="tab-pane active">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">➕ Generate Secure Customer Drop Endpoint</div>
+          </div>
+          <form id="create-drop-form" onsubmit="handleCreateDrop(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Drop Label</label>
+                <input type="text" id="drop-label" class="form-control" placeholder="e.g. Passport & Driving License" required>
+              </div>
+              <div class="form-group">
+                <label>Max Allowed Size (MB)</label>
+                <input type="number" id="drop-max-mb" class="form-control" value="100" min="1" max="1024" required>
+              </div>
+              <div class="form-group">
+                <label>TTL Expiry (Minutes)</label>
+                <input type="number" id="drop-ttl-min" class="form-control" value="60" min="5" max="1440" required>
+              </div>
+            </div>
+            <button type="submit" class="btn">Generate Custom Drop Endpoint</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">📫 Active Customer Drops</div>
+            <button class="btn btn-secondary btn-sm" onclick="loadDrops()">🔄 Refresh Drops</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Drop Code</th>
+                  <th>Label</th>
+                  <th>Cloudflare Vanity Link</th>
+                  <th>Local LAN Test</th>
+                  <th>Max Size</th>
+                  <th>Expires In</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="drops-table-body">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading drops...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Staff Tab 2: Verified Uploads -->
+      <section id="staff-pane-uploads" class="tab-pane">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">📥 Uploaded Customer Documents (Verified & Encrypted at Rest)</div>
+            <button class="btn btn-secondary btn-sm" onclick="loadUploads()">🔄 Refresh Uploads</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>File Name</th>
+                  <th>Drop</th>
+                  <th>Size</th>
+                  <th>Tree Hash</th>
+                  <th>Status</th>
+                  <th>Manager Notary</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="uploads-table-body">
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading uploads...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Staff Tab 3: Kiosk Session & Obliteration -->
+      <section id="staff-pane-session" class="tab-pane">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">🖥️ Ephemeral Kiosk Session Controller</div>
+            <span id="session-active-badge" class="badge badge-rose">No Active Session</span>
+          </div>
+
+          <div id="no-session-box" style="text-align: center; padding: 2rem;">
+            <p style="color: var(--text-muted); margin-bottom: 1.25rem;">
+              No customer is currently logged into an ephemeral workspace. Initialize a session to securely deliver verified customer files.
+            </p>
+            <button class="btn btn-emerald btn-lg" onclick="startKioskSession()">✨ Start Ephemeral Kiosk Session</button>
+          </div>
+
+          <div id="active-session-box" style="display: none;">
+            <div style="background: rgba(0,0,0,0.3); padding: 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; line-height: 1.8; font-size: 0.9rem;">
+              <div><strong>Session ID:</strong> <span class="code-text" id="sess-id-display"></span></div>
+              <div><strong>Workspace Path:</strong> <span class="code-text" id="sess-path-display"></span></div>
+              <div><strong>Status:</strong> <span class="badge badge-emerald">Active Customer Working</span></div>
+            </div>
+
+            <!-- Red Obliteration Button -->
+            <div class="obliterate-box">
+              <div style="font-size: 1.35rem; font-weight: 800; color: #fda4af; margin-bottom: 0.5rem;">
+                🚨 COMPLETE WORKSPACE OBLITERATION ENGINE
+              </div>
+              <p style="font-size: 0.9rem; color: #fecdd3; max-width: 600px; margin: 0 auto 1.5rem;">
+                When customer session concludes, click below to execute full crypto-shredding: wipe the isolated workspace directory, destroy per-session keys, and mathematically verify zero file residual.
+              </p>
+              <button class="btn btn-rose btn-lg" id="btn-obliterate" onclick="executeObliterateSession()">
+                ⚡ OBLITERATE ALL CUSTOMER DATA NOW
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">📜 Session Obliteration Audit History</div>
+            <button class="btn btn-secondary btn-sm" onclick="loadSessions()">🔄 Refresh</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Session ID</th>
+                  <th>Workspace Path</th>
+                  <th>Started At</th>
+                  <th>Ended At</th>
+                  <th>Destruction Status</th>
+                </tr>
+              </thead>
+              <tbody id="sessions-table-body">
+                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading session history...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Staff Tab 4: Signed OTA Updater -->
+      <section id="staff-pane-ota" class="tab-pane">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">🔄 Signed OTA Update Management</div>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+            When Central Manager distributes a new signed .bin firmware/OS patch, this hub verifies the Ed25519 signature, checksums the payload, and activates the new image.
+          </p>
+
+          <div style="background: rgba(0,0,0,0.3); padding: 1.25rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+              <div>
+                <span class="meta-label">Current Image File</span>
+                <div class="meta-value" id="ota-image-file" style="margin-top: 0.25rem;">base_image.bin</div>
+              </div>
+              <div>
+                <span class="meta-label">Active Version</span>
+                <div class="meta-value" id="ota-image-version" style="margin-top: 0.25rem;">1.0.0</div>
+              </div>
+              <div>
+                <span class="meta-label">Sync Status</span>
+                <div id="ota-sync-status" style="margin-top: 0.25rem;"><span class="badge badge-emerald">Up to Date</span></div>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-emerald" id="btn-check-ota" onclick="handleTriggerOTA()">
+            🔍 Check & Apply OTA Update Now
+          </button>
+          <div id="ota-result-message" style="margin-top: 1rem; font-size: 0.9rem; display: none;"></div>
+        </div>
+      </section>
+
+      <!-- Staff Tab 5: Staff Team & User Management -->
+      <section id="staff-pane-team" class="tab-pane">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">➕ Add New Staff / Operator Member</div>
+          </div>
+          <form id="create-user-form" onsubmit="handleCreateStaffUser(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="new-user-name" class="form-control" placeholder="e.g. operator1" required minlength="3">
+              </div>
+              <div class="form-group">
+                <label>Password (Argon2id)</label>
+                <input type="password" id="new-user-pass" class="form-control" placeholder="Password (min 6 chars)" required minlength="6">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-emerald">Create Staff Account</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">👥 Authorized Staff & Operators</div>
+            <button class="btn btn-secondary btn-sm" onclick="loadUsers()">🔄 Refresh Team</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Account ID</th>
+                  <th>Created At</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body">
+                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Loading staff members...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- Modal: Node Enrollment -->
+  <div id="enroll-modal" class="modal-backdrop">
+    <div class="modal-box">
+      <h3 style="margin-bottom: 0.5rem;">🌐 Enroll Node to Central Manager</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+        Link this kiosk hub to your Central Manager using a zero-trust enrollment token.
+      </p>
+      <form id="enroll-form" onsubmit="handleEnrollSubmit(event)">
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label>Central Manager URL</label>
+          <input type="url" id="enroll-manager-url" class="form-control" value="http://localhost:8000" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label>Enrollment Token</label>
+          <input type="text" id="enroll-token" class="form-control code-text" placeholder="Paste token issued by manager..." required>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeEnrollModal()">Cancel</button>
+          <button type="submit" class="btn btn-emerald">Complete Enrollment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script>
+    let staffToken = localStorage.getItem('vault_staff_token') || '';
+    let staffUser = null;
+    let activeDrop = null;
+    let activeSession = null;
+    let selectedFile = null;
+    let currentReceipt = null;
+    let lockoutTimerInterval = null;
+    let currentAuthMode = 'login';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initApp();
+    });
+
+    async function initApp() {
+      const path = window.location.pathname;
+      if (path.startsWith('/p/') || path.includes('/d/')) {
+        // Customer Portal Mode
+        const parts = path.split('/').filter(Boolean);
+        const code = parts[parts.length - 1];
+        initCustomerPortal(code);
+      } else {
+        // Staff Hub Mode
+        initStaffHub();
+      }
+    }
+
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+      toast.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.4s ease';
+        setTimeout(() => toast.remove(), 400);
+      }, 3500);
+    }
+
+    // ==========================================
+    // CUSTOMER PORTAL IMPLEMENTATION
+    // ==========================================
+    async function initCustomerPortal(code) {
+      document.getElementById('view-customer-portal').style.display = 'block';
+      document.getElementById('app-header-title').textContent = 'Vault Client Portal';
+      document.getElementById('app-header-subtitle').textContent = 'Secure Cryptographic Document Deposit';
+
+      try {
+        const res = await fetch(`/p/${encodeURIComponent(code)}`, {
+          headers: {'Accept': 'application/json'}
+        });
+        if (!res.ok) {
+          throw new Error('Drop not found, expired, or already closed.');
+        }
+        activeDrop = await res.json();
+        renderPortalDropInfo();
+      } catch (err) {
+        document.getElementById('view-customer-portal').innerHTML = `
+          <div class="panel" style="max-width: 500px; margin: 4rem auto; text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+            <h2 style="margin-bottom: 0.5rem;">Drop Unavailable</h2>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">${escapeHtml(err.message)}</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderPortalDropInfo() {
+      document.getElementById('portal-drop-title').textContent = activeDrop.label || 'Client Document Drop';
+      const maxMb = (activeDrop.max_bytes / (1024 * 1024)).toFixed(0);
+      document.getElementById('portal-max-size').textContent = `${maxMb} MB`;
+
+      // Start countdown
+      updateCountdown();
+      setInterval(updateCountdown, 1000);
+    }
+
+    function updateCountdown() {
+      if (!activeDrop) return;
+      const now = Date.now() / 1000;
+      const diff = Math.max(0, Math.floor(activeDrop.expires_at - now));
+      const m = Math.floor(diff / 60);
+      const s = diff % 60;
+      document.getElementById('portal-countdown').textContent = `${m}m ${s < 10 ? '0' : ''}${s}s`;
+      if (diff <= 0) {
+        document.getElementById('portal-countdown').textContent = 'EXPIRED';
+        document.getElementById('portal-countdown').style.color = 'var(--rose)';
+      }
+    }
+
+    function handleFileSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (activeDrop && file.size > activeDrop.max_bytes) {
+        showToast(`File size (${(file.size / 1024 / 1024).toFixed(1)} MB) exceeds drop limit (${(activeDrop.max_bytes / 1024 / 1024).toFixed(1)} MB)`, 'error');
+        return;
+      }
+
+      selectedFile = file;
+      document.getElementById('selected-file-info').style.display = 'block';
+      document.getElementById('file-name-display').textContent = file.name;
+      const chunkSize = 8 * 1024 * 1024;
+      const totalChunks = Math.ceil(file.size / chunkSize) || 1;
+      const sizeStr = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+      document.getElementById('file-size-display').textContent = `${sizeStr} • ${totalChunks} chunk(s)`;
+    }
+
+    async function startChunkedUpload() {
+      if (!selectedFile || !activeDrop) return;
+
+      const btn = document.getElementById('btn-start-upload');
+      btn.disabled = true;
+      btn.textContent = 'Uploading...';
+
+      const progressContainer = document.getElementById('upload-progress-container');
+      const progressFill = document.getElementById('upload-progress-fill');
+      const statusText = document.getElementById('upload-status-text');
+
+      progressContainer.style.display = 'block';
+      statusText.style.display = 'block';
+      statusText.textContent = 'Initiating chunked upload session...';
+
+      const chunkSize = 8 * 1024 * 1024;
+      const totalChunks = Math.ceil(selectedFile.size / chunkSize) || 1;
+
+      try {
+        // 1. Initialize upload session
+        const initRes = await fetch(`/p/${activeDrop.code}/uploads`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            display_name: selectedFile.name,
+            size: selectedFile.size,
+            chunk_size: chunkSize
+          })
+        });
+        if (!initRes.ok) throw new Error('Failed to initialize upload session');
+        const { upload_id } = await initRes.json();
+
+        // 2. Upload chunks with SHA-256 calculation
+        const chunkDigestsBytes = [];
+        const chunkDigestsHex = [];
+
+        for (let idx = 0; idx < totalChunks; idx++) {
+          const start = idx * chunkSize;
+          const end = Math.min(start + chunkSize, selectedFile.size);
+          const chunkBlob = selectedFile.slice(start, end);
+          const chunkBuffer = await chunkBlob.arrayBuffer();
+
+          // In-browser SHA-256
+          const hashBuf = await crypto.subtle.digest('SHA-256', chunkBuffer);
+          const hashArray = new Uint8Array(hashBuf);
+          const hashHex = Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
+
+          chunkDigestsBytes.push(hashArray);
+          chunkDigestsHex.push(hashHex);
+
+          statusText.textContent = `Uploading chunk ${idx + 1} of ${totalChunks} (${hashHex.slice(0, 8)}...)...`;
+
+          const chunkRes = await fetch(`/p/${activeDrop.code}/uploads/${upload_id}/chunks/${idx}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/octet-stream',
+              'X-Chunk-SHA256': hashHex
+            },
+            body: chunkBuffer
+          });
+
+          if (!chunkRes.ok) {
+            throw new Error(`Chunk ${idx} upload rejected`);
+          }
+
+          const pct = Math.round(((idx + 1) / totalChunks) * 100);
+          progressFill.style.width = `${pct}%`;
+        }
+
+        // 3. Compute domain-separated tree hash
+        statusText.textContent = 'Verifying Merkle tree hash integrity...';
+        const computedTree = await computeTreeHash(chunkDigestsBytes, selectedFile.size, chunkSize);
+
+        // 4. Complete upload
+        const compRes = await fetch(`/p/${activeDrop.code}/uploads/${upload_id}/complete`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            chunk_digests: chunkDigestsHex,
+            tree_hash: computedTree
+          })
+        });
+
+        if (!compRes.ok) {
+          const err = await compRes.json();
+          throw new Error(err.detail || 'Upload completion failed');
+        }
+
+        const compData = await compRes.json();
+        currentReceipt = compData;
+
+        // Show receipt
+        statusText.textContent = 'Upload verified and cryptographically signed!';
+        document.getElementById('selected-file-info').style.display = 'none';
+        document.getElementById('portal-receipt-card').style.display = 'block';
+
+        document.getElementById('receipt-upload-id').textContent = compData.receipt.upload_id;
+        document.getElementById('receipt-tree-hash').textContent = compData.receipt.tree_hash;
+        document.getElementById('receipt-hub-sig').textContent = compData.hub_sig ? compData.hub_sig.slice(0, 16) + '...' : 'N/A';
+        document.getElementById('receipt-ack-seq').textContent = compData.manager_ack_seq ? `#${compData.manager_ack_seq}` : 'Notarized Locally';
+        document.getElementById('receipt-timestamp').textContent = new Date(compData.receipt.received_at * 1000).toLocaleString();
+
+        showToast('Document securely uploaded and notarized!', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+        statusText.textContent = `Error: ${err.message}`;
+        btn.disabled = false;
+        btn.textContent = 'Retry Upload';
+      }
+    }
+
+    async function computeTreeHash(chunkDigestsBytes, totalSize, chunkSize) {
+      const enc = new TextEncoder();
+      const prefix = enc.encode("vault-file-v1\0");
+
+      const csBuf = new ArrayBuffer(4);
+      new DataView(csBuf).setUint32(0, chunkSize, false);
+
+      const tsBuf = new ArrayBuffer(8);
+      new DataView(tsBuf).setBigUint64(0, BigInt(totalSize), false);
+
+      let totalLen = prefix.length + 4 + 8;
+      for (const d of chunkDigestsBytes) totalLen += d.length;
+
+      const fullInput = new Uint8Array(totalLen);
+      fullInput.set(prefix, 0);
+      fullInput.set(new Uint8Array(csBuf), prefix.length);
+      fullInput.set(new Uint8Array(tsBuf), prefix.length + 4);
+
+      let offset = prefix.length + 12;
+      for (const d of chunkDigestsBytes) {
+        fullInput.set(d, offset);
+        offset += d.length;
+      }
+
+      const hashBuf = await crypto.subtle.digest('SHA-256', fullInput);
+      return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function downloadReceiptFile() {
+      if (!currentReceipt) return;
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(currentReceipt, null, 2));
+      const a = document.createElement('a');
+      a.setAttribute('href', dataStr);
+      a.setAttribute('download', `vault-receipt-${currentReceipt.receipt.upload_id.slice(0, 8)}.json`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function resetPortalView() {
+      selectedFile = null;
+      currentReceipt = null;
+      document.getElementById('portal-receipt-card').style.display = 'none';
+      document.getElementById('upload-progress-container').style.display = 'none';
+      document.getElementById('upload-status-text').style.display = 'none';
+      document.getElementById('file-upload-input').value = '';
+    }
+
+    // ==========================================
+    // STAFF HUB & KIOSK CONSOLE IMPLEMENTATION
+    // ==========================================
+    async function initStaffHub() {
+      // 1. Check bootstrap status
+      try {
+        const res = await fetch('/api/v1/auth/status');
+        const data = await res.json();
+        if (!data.bootstrapped) {
+          // Show Bootstrap form
+          showAuthView('bootstrap');
+          return;
+        }
+      } catch (err) {
+        console.error('Auth status error:', err);
+      }
+
+      // 2. Check if logged in
+      if (!staffToken) {
+        showAuthView('login');
+        return;
+      }
+
+      // Verify token
+      try {
+        const res = await fetch('/api/v1/auth/me', {
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (res.ok) {
+          staffUser = await res.json();
+          showStaffConsole();
+        } else {
+          localStorage.removeItem('vault_staff_token');
+          staffToken = '';
+          showAuthView('login');
+        }
+      } catch (err) {
+        showAuthView('login');
+      }
+    }
+
+    function setAuthMode(mode) {
+      currentAuthMode = mode;
+      const tabLogin = document.getElementById('tab-auth-login');
+      const tabRegister = document.getElementById('tab-auth-register');
+      const title = document.getElementById('auth-title');
+      const subtitle = document.getElementById('auth-subtitle');
+      const btn = document.getElementById('btn-auth-submit');
+
+      if (mode === 'register') {
+        if (tabLogin) { tabLogin.style.background = 'transparent'; tabLogin.style.color = 'var(--text-muted)'; }
+        if (tabRegister) { tabRegister.style.background = 'var(--primary)'; tabRegister.style.color = '#fff'; }
+
+        title.textContent = 'Register New Staff Member';
+        subtitle.textContent = 'Create a secure operator credential for this kiosk hub';
+        btn.textContent = 'Create Account & Sign In';
+        btn.className = 'btn btn-emerald';
+      } else {
+        currentAuthMode = 'login';
+        if (tabLogin) { tabLogin.style.background = 'var(--primary)'; tabLogin.style.color = '#fff'; }
+        if (tabRegister) { tabRegister.style.background = 'transparent'; tabRegister.style.color = 'var(--text-muted)'; }
+
+        title.textContent = 'Staff Authentication';
+        subtitle.textContent = 'Log in to manage customer drops and kiosk sessions';
+        btn.textContent = 'Sign In';
+        btn.className = 'btn btn-primary';
+      }
+    }
+
+    function showAuthView(mode) {
+      document.getElementById('view-auth').style.display = 'block';
+      document.getElementById('view-staff-console').style.display = 'none';
+      document.getElementById('staff-user-badge').style.display = 'none';
+
+      const modeSwitch = document.getElementById('auth-mode-switch');
+      const title = document.getElementById('auth-title');
+      const subtitle = document.getElementById('auth-subtitle');
+      const btn = document.getElementById('btn-auth-submit');
+
+      if (mode === 'bootstrap') {
+        currentAuthMode = 'bootstrap';
+        if (modeSwitch) modeSwitch.style.display = 'none';
+        title.textContent = 'Initial Hub Bootstrap';
+        subtitle.textContent = 'Create the primary shop owner account for this node';
+        btn.textContent = 'Bootstrap Owner Account';
+        btn.className = 'btn btn-emerald';
+      } else {
+        if (modeSwitch) modeSwitch.style.display = 'flex';
+        setAuthMode(mode === 'register' ? 'register' : 'login');
+      }
+    }
+
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      const username = document.getElementById('auth-username').value.trim();
+      const password = document.getElementById('auth-password').value;
+
+      if (currentAuthMode === 'bootstrap') {
+        try {
+          const res = await fetch('/api/v1/auth/bootstrap', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username, password})
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Bootstrap failed');
+          }
+          showToast('Hub bootstrapped successfully! Signing in...', 'success');
+          await doLogin(username, password);
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      } else if (currentAuthMode === 'register') {
+        try {
+          const res = await fetch('/api/v1/auth/register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username, password})
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Registration failed');
+          }
+          showToast('Staff account registered successfully! Signing in...', 'success');
+          await doLogin(username, password);
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      } else {
+        await doLogin(username, password);
+      }
+    }
+
+    async function doLogin(username, password) {
+      try {
+        const res = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({username, password})
+        });
+
+        if (res.status === 429) {
+          const data = await res.json();
+          handleLockout(data.detail || 'Account locked');
+          return;
+        }
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Authentication failed');
+        }
+
+        const data = await res.json();
+        staffToken = data.access_token;
+        localStorage.setItem('vault_staff_token', staffToken);
+        showToast('Logged in successfully!', 'success');
+        initStaffHub();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function handleLockout(detailMsg) {
+      const banner = document.getElementById('lockout-banner');
+      const countdown = document.getElementById('lockout-countdown');
+      banner.style.display = 'block';
+
+      // Parse seconds from msg if present, default 30s
+      let seconds = 30;
+      const match = detailMsg.match(/(\d+)\s*seconds/i);
+      if (match) seconds = parseInt(match[1], 10);
+
+      countdown.textContent = seconds;
+      document.getElementById('btn-auth-submit').disabled = true;
+
+      clearInterval(lockoutTimerInterval);
+      lockoutTimerInterval = setInterval(() => {
+        seconds--;
+        countdown.textContent = seconds;
+        if (seconds <= 0) {
+          clearInterval(lockoutTimerInterval);
+          banner.style.display = 'none';
+          document.getElementById('btn-auth-submit').disabled = false;
+        }
+      }, 1000);
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('vault_staff_token');
+      staffToken = '';
+      staffUser = null;
+      initStaffHub();
+    }
+
+    function showStaffConsole() {
+      document.getElementById('view-auth').style.display = 'none';
+      document.getElementById('view-staff-console').style.display = 'block';
+      document.getElementById('staff-user-badge').style.display = 'flex';
+      document.getElementById('staff-name-display').textContent = `${staffUser.username} (${staffUser.role})`;
+
+      loadSystemStatus();
+      loadDrops();
+      loadUploads();
+      loadSessions();
+      loadUsers();
+    }
+
+    function switchStaffTab(tabId) {
+      document.querySelectorAll('#view-staff-console .tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('#view-staff-console .tab-pane').forEach(pane => pane.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      const target = document.getElementById(`staff-pane-${tabId}`);
+      if (target) target.classList.add('active');
+    }
+
+    async function loadSystemStatus() {
+      try {
+        const res = await fetch('/api/v1/system/status');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const slug = data.cafe_slug || 'local';
+        const tunnelBase = 'https://vocals-shakespeare-fragrance-distances.trycloudflare.com';
+        document.getElementById('node-slug-display').textContent = slug;
+        document.getElementById('node-device-display').textContent = data.device_id ? data.device_id.slice(0, 8) + '...' : 'Not Enrolled';
+        document.getElementById('node-image-display').textContent = `${data.active_image_file} (v${data.image_version})`;
+        document.getElementById('node-vanity-display').innerHTML = `
+          <a href="${tunnelBase}/${slug}/d/" target="_blank" style="color: #10b981; text-decoration: none; font-size: 0.85rem;">${tunnelBase.replace('https://', '')}/${slug}/d/... ↗</a>
+          <div style="font-size: 0.72rem; color: #9ca3af; margin-top: 2px;">Custom: vault.laddu.cc/${slug} (pointing to tunnel)</div>
+        `;
+
+        document.getElementById('ota-image-file').textContent = data.active_image_file;
+        document.getElementById('ota-image-version').textContent = data.image_version;
+      } catch (err) {
+        console.error('System status error:', err);
+      }
+    }
+
+    // Drop Management
+    async function loadDrops() {
+      try {
+        const res = await fetch('/api/v1/drops', {
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (!res.ok) return;
+        const drops = await res.json();
+        const tbody = document.getElementById('drops-table-body');
+        if (!drops || drops.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No active drops. Generate one above.</td></tr>';
+          return;
+        }
+
+        const now = Date.now() / 1000;
+        tbody.innerHTML = drops.map(d => {
+          const isExpired = d.expires_at < now || d.status !== 'open';
+          const minsLeft = Math.max(0, Math.floor((d.expires_at - now) / 60));
+          const maxMb = (d.max_bytes / (1024 * 1024)).toFixed(0) + ' MB';
+          const tunnelUrl = d.tunnel_url || `https://vocals-shakespeare-fragrance-distances.trycloudflare.com/${d.cafe_slug || 'local'}/d/${d.code}`;
+
+          return `
+            <tr>
+              <td><strong><span class="code-text">${escapeHtml(d.code)}</span></strong></td>
+              <td>${escapeHtml(d.label)}</td>
+              <td>
+                <div style="margin-bottom: 0.25rem;">
+                  <span class="code-text" style="color: #10b981;" title="${escapeHtml(tunnelUrl)}">${escapeHtml(tunnelUrl.slice(0, 42))}...</span>
+                  <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${escapeHtml(tunnelUrl)}'); showToast('Cloudflare tunnel link copied!', 'success');" title="Copy live TryCloudflare Link">📋</button>
+                </div>
+                <div style="font-size: 0.75rem; color: #9ca3af;">
+                  Custom: <span class="code-text" style="color: #60a5fa;">${escapeHtml(d.portal_url)}</span>
+                </div>
+              </td>
+              <td>
+                <a href="${escapeHtml(tunnelUrl)}" target="_blank" style="color: var(--emerald); text-decoration: none; font-weight: 600;">Open Live Portal ↗</a>
+              </td>
+              <td>${maxMb}</td>
+              <td>${isExpired ? '<span class="badge badge-rose">Expired</span>' : `${minsLeft} min(s)`}</td>
+              <td><span class="badge ${d.status === 'open' && !isExpired ? 'badge-emerald' : 'badge-rose'}">${escapeHtml(d.status)}</span></td>
+              <td>
+                ${d.status === 'open' && !isExpired ? `<button class="btn btn-secondary btn-sm" onclick="closeDrop('${escapeHtml(d.code)}')">Revoke</button>` : '<span style="color:var(--text-muted);">-</span>'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Drops error:', err);
+      }
+    }
+
+    async function handleCreateDrop(e) {
+      e.preventDefault();
+      const label = document.getElementById('drop-label').value.trim();
+      const maxMb = parseInt(document.getElementById('drop-max-mb').value, 10);
+      const ttl = parseInt(document.getElementById('drop-ttl-min').value, 10);
+
+      try {
+        const res = await fetch('/api/v1/drops', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${staffToken}`
+          },
+          body: JSON.stringify({
+            label,
+            max_bytes: maxMb * 1024 * 1024,
+            ttl_minutes: ttl
+          })
+        });
+        if (!res.ok) throw new Error('Failed to generate drop endpoint');
+        showToast('Secure Drop Endpoint Generated!', 'success');
+        document.getElementById('create-drop-form').reset();
+        loadDrops();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function closeDrop(code) {
+      try {
+        const res = await fetch(`/api/v1/drops/${encodeURIComponent(code)}/close`, {
+          method: 'POST',
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (res.ok) {
+          showToast('Drop endpoint revoked.', 'success');
+          loadDrops();
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // Uploads
+    async function loadUploads() {
+      try {
+        const res = await fetch('/api/v1/uploads', {
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (!res.ok) return;
+        const uploads = await res.json();
+        const tbody = document.getElementById('uploads-table-body');
+        if (!uploads || uploads.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No verified customer uploads yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = uploads.map(u => {
+          const sizeKb = (u.declared_size / 1024).toFixed(1) + ' KB';
+          const treeHash = u.tree_hash || 'N/A';
+          const ackBadge = u.manager_ack_seq ? `<span class="badge badge-emerald">Ack #${u.manager_ack_seq}</span>` : `<span class="badge badge-amber">Local Notary</span>`;
+
+          return `
+            <tr>
+              <td><strong>${escapeHtml(u.display_name)}</strong></td>
+              <td><span class="code-text">${escapeHtml(u.drop_code)}</span></td>
+              <td>${sizeKb}</td>
+              <td><span class="code-text" title="${treeHash}">${treeHash.slice(0, 16)}...</span></td>
+              <td><span class="badge badge-emerald">${escapeHtml(u.status)}</span></td>
+              <td>${ackBadge}</td>
+              <td>
+                <button class="btn btn-emerald btn-sm" onclick="deliverUploadToWorkspace('${escapeHtml(u.id)}')">Deliver to Workspace</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Uploads error:', err);
+      }
+    }
+
+    // Sessions & Obliteration
+    async function loadSessions() {
+      try {
+        const res = await fetch('/api/v1/sessions', {
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (!res.ok) return;
+        const sessions = await res.json();
+
+        // Check active session
+        activeSession = sessions.find(s => s.status === 'active');
+        const activeBadge = document.getElementById('session-active-badge');
+        const noSessBox = document.getElementById('no-session-box');
+        const activeSessBox = document.getElementById('active-session-box');
+
+        if (activeSession) {
+          activeBadge.className = 'badge badge-emerald';
+          activeBadge.textContent = 'Active Kiosk Session';
+          noSessBox.style.display = 'none';
+          activeSessBox.style.display = 'block';
+
+          document.getElementById('sess-id-display').textContent = activeSession.id;
+          document.getElementById('sess-path-display').textContent = activeSession.workspace_path;
+        } else {
+          activeBadge.className = 'badge badge-rose';
+          activeBadge.textContent = 'No Active Session';
+          noSessBox.style.display = 'block';
+          activeSessBox.style.display = 'none';
+        }
+
+        // Table
+        const tbody = document.getElementById('sessions-table-body');
+        if (!sessions || sessions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No sessions recorded.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = sessions.map(s => {
+          const started = new Date(s.started_at * 1000).toLocaleTimeString();
+          const ended = s.ended_at ? new Date(s.ended_at * 1000).toLocaleTimeString() : 'In Progress';
+          let statusBadge = '<span class="badge badge-emerald">Active</span>';
+          if (s.status === 'wiped') statusBadge = '<span class="badge badge-rose">Obliterated & Shredded</span>';
+
+          return `
+            <tr>
+              <td><span class="code-text">${s.id.slice(0, 8)}...</span></td>
+              <td><span class="code-text">${escapeHtml(s.workspace_path)}</span></td>
+              <td>${started}</td>
+              <td>${ended}</td>
+              <td>${statusBadge}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Sessions error:', err);
+      }
+    }
+
+    async function startKioskSession() {
+      try {
+        const res = await fetch('/api/v1/session/start', {
+          method: 'POST',
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (!res.ok) throw new Error('Failed to start session');
+        showToast('Ephemeral Kiosk Workspace initialized!', 'success');
+        loadSessions();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deliverUploadToWorkspace(uploadId) {
+      if (!activeSession) {
+        showToast('Please start an Ephemeral Kiosk Session first in the Kiosk Session tab!', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/v1/session/${activeSession.id}/deliver/${uploadId}`, {
+          method: 'POST',
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Delivery failed');
+        }
+        const data = await res.json();
+        showToast(`Delivered '${data.file_name}' to workspace!`, 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function executeObliterateSession() {
+      if (!activeSession) return;
+      if (!confirm('⚠️ CONFIRM OBLITERATION:\n\nAre you sure you want to obliterate this session? All files, decrypted documents, and RAM keys will be permanently crypto-shredded with zero recovery possible.')) {
+        return;
+      }
+
+      const btn = document.getElementById('btn-obliterate');
+      btn.disabled = true;
+      btn.textContent = '⚡ Shredding Files & Obliterating Workspace...';
+
+      try {
+        const res = await fetch(`/api/v1/session/${activeSession.id}/end`, {
+          method: 'POST',
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Obliteration failed');
+        }
+        const data = await res.json();
+        showToast('VERIFIED OBLITERATION: Workspace and keys crypto-shredded!', 'success');
+        loadSessions();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ OBLITERATE ALL CUSTOMER DATA NOW';
+      }
+    }
+
+    // OTA Updater
+    async function handleTriggerOTA() {
+      const btn = document.getElementById('btn-check-ota');
+      const msgBox = document.getElementById('ota-result-message');
+      btn.disabled = true;
+      btn.textContent = 'Checking & Applying Updates...';
+      msgBox.style.display = 'block';
+      msgBox.className = '';
+      msgBox.style.color = '#94a3b8';
+      msgBox.textContent = 'Contacting Central Manager for signed security manifests...';
+
+      try {
+        const res = await fetch('/api/v1/system/check-update', {
+          method: 'POST',
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'OTA check failed');
+        }
+        const data = await res.json();
+
+        if (data.status === 'applied') {
+          msgBox.style.color = 'var(--emerald)';
+          msgBox.innerHTML = `
+            <strong>🎉 NEW SIGNED UPDATE APPLIED!</strong><br>
+            Upgraded from v${data.previous_version} to <strong>v${data.new_version}</strong>.<br>
+            Activated image: <span class="code-text">${escapeHtml(data.active_image_file)}</span> (SHA-256: ${data.sha256.slice(0, 16)}...)
+          `;
+          showToast(`OTA Update to v${data.new_version} applied!`, 'success');
+        } else if (data.status === 'up_to_date') {
+          msgBox.style.color = '#60a5fa';
+          msgBox.textContent = `Node is already up to date running image version ${data.current_image_version}.`;
+        } else {
+          msgBox.style.color = 'var(--rose)';
+          msgBox.textContent = data.message || 'OTA update failed.';
+        }
+
+        loadSystemStatus();
+      } catch (err) {
+        msgBox.style.color = 'var(--rose)';
+        msgBox.textContent = `Error: ${err.message}`;
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔍 Check & Apply OTA Update Now';
+      }
+    }
+
+    // Enrollment Modal
+    function openEnrollModal() {
+      document.getElementById('enroll-modal').classList.add('open');
+    }
+    function closeEnrollModal() {
+      document.getElementById('enroll-modal').classList.remove('open');
+    }
+
+    async function handleEnrollSubmit(e) {
+      e.preventDefault();
+      const manager_url = document.getElementById('enroll-manager-url').value.trim();
+      const token = document.getElementById('enroll-token').value.trim();
+
+      try {
+        const res = await fetch('/api/v1/system/enroll', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${staffToken}`
+          },
+          body: JSON.stringify({manager_url, token})
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Enrollment rejected');
+        }
+        const data = await res.json();
+        showToast(`Enrolled successfully! Assigned Café Slug: ${data.cafe_slug}`, 'success');
+        closeEnrollModal();
+        loadSystemStatus();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // Staff Team Management
+    async function loadUsers() {
+      try {
+        const res = await fetch('/api/v1/users', {
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (!res.ok) return;
+        const users = await res.json();
+        const tbody = document.getElementById('users-table-body');
+        if (!tbody) return;
+        if (!users || users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No staff members found.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = users.map(u => {
+          const created = new Date(u.created_at * 1000).toLocaleString();
+          const roleBadge = u.role === 'owner'
+            ? '<span class="badge badge-emerald">Shop Owner</span>'
+            : '<span class="badge badge-blue">Staff / Operator</span>';
+
+          return `
+            <tr>
+              <td><strong style="color: var(--text-main);">${escapeHtml(u.username)}</strong></td>
+              <td>${roleBadge}</td>
+              <td><span class="code-text">${escapeHtml(u.id.slice(0, 8))}...</span></td>
+              <td><span style="font-size: 0.85rem; color: var(--text-muted);">${created}</span></td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Users error:', err);
+      }
+    }
+
+    async function handleCreateStaffUser(e) {
+      e.preventDefault();
+      const username = document.getElementById('new-user-name').value.trim();
+      const password = document.getElementById('new-user-pass').value;
+
+      try {
+        const res = await fetch('/api/v1/auth/register', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({username, password})
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Failed to create staff account');
+        }
+        showToast(`Staff member '${username}' created successfully!`, 'success');
+        document.getElementById('create-user-form').reset();
+        loadUsers();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
