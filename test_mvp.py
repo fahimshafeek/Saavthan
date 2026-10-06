@@ -187,6 +187,12 @@ async def test_full_vault_lifecycle():
         receipt_bytes = server.canonical_json(complete_data["receipt"])
         assert manager.ed25519_verify(hub_pub, receipt_bytes, complete_data["hub_sig"]) is True
 
+        # Test direct staff decryption & download endpoint
+        dl_res = await srv_client.get(f"/api/v1/uploads/{upload_id}/download", headers=auth_headers)
+        assert dl_res.status_code == 200
+        assert dl_res.content == file_payload
+        assert 'attachment; filename="passport_application.pdf"' in dl_res.headers["content-disposition"]
+
         # 7. Verify Transparency Log Notarization on Manager
         sk = manager.SigningKey(manager.unb64u(ident["private_key_b64"]))
         ts = str(int(time.time()))

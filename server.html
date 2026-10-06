@@ -1569,8 +1569,10 @@
               <td><span class="code-text" title="${treeHash}">${treeHash.slice(0, 16)}...</span></td>
               <td><span class="badge badge-emerald">${escapeHtml(u.status)}</span></td>
               <td>${ackBadge}</td>
-              <td>
-                <button class="btn btn-emerald btn-sm" onclick="deliverUploadToWorkspace('${escapeHtml(u.id)}')">Deliver to Workspace</button>
+              <td style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button class="btn btn-emerald btn-sm" onclick="downloadUploadFile('${escapeHtml(u.id)}', '${escapeHtml(u.display_name)}', false)">📥 Download</button>
+                <button class="btn btn-slate btn-sm" onclick="downloadUploadFile('${escapeHtml(u.id)}', '${escapeHtml(u.display_name)}', true)">👁️ Preview</button>
+                <button class="btn btn-amber btn-sm" onclick="deliverUploadToWorkspace('${escapeHtml(u.id)}')">💻 Deliver to Kiosk</button>
               </td>
             </tr>
           `;
@@ -1669,6 +1671,34 @@
         }
         const data = await res.json();
         showToast(`Delivered '${data.file_name}' to workspace!`, 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function downloadUploadFile(uploadId, fileName, inline = false) {
+      try {
+        showToast(inline ? 'Decrypting & opening preview...' : 'Decrypting & starting download...', 'info');
+        const res = await fetch(`/api/v1/uploads/${uploadId}/download${inline ? '?inline=true' : ''}`, {
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({detail: 'Download failed'}));
+          throw new Error(err.detail || 'Download failed');
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        if (inline) {
+          window.open(url, '_blank');
+        } else {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+        }
       } catch (err) {
         showToast(err.message, 'error');
       }

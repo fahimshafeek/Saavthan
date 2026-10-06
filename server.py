@@ -15,6 +15,7 @@ import base64
 import hashlib
 import hmac
 import json
+import mimetypes
 import os
 import shutil
 import sqlite3
@@ -993,6 +994,55 @@ async def list_uploads(staff: dict = Depends(require_staff)):
         d.pop("receipt_json", None)
         results.append(d)
     return results
+
+@app.get("/api/v1/uploads/{upload_id}/download")
+async def download_upload_file(
+    upload_id: str,
+    inline: bool = False,
+    staff: dict = Depends(require_staff)
+):
+    """
+    Decrypts verified upload chunks on-the-fly and returns the plaintext file
+    for staff members (e.g. Akshaya center operators) to view, download, or forward.
+    Requires valid staff Bearer token.
+    """
+    conn = get_db()
+    upload = conn.execute("SELECT * FROM uploads WHERE id = ? AND status = 'verified'", (upload_id,)).fetchone()
+    if not upload:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Verified upload not found")
+
+    chunks = conn.execute("SELECT idx, sha256 FROM chunks WHERE upload_id = ? ORDER BY idx ASC", (upload_id,)).fetchall()
+    dek = unb64u(upload["dek_b64"])
+    conn.close()
+
+    decrypted_bytes = bytearray()
+    for c in chunks:
+        chunk_file = STAGING_DIR / upload_id / f"{c['idx']}.chunk"
+        if not chunk_file.exists():
+            raise HTTPException(status_code=500, detail=f"Missing chunk file index {c['idx']}")
+        with open(chunk_file, "rb") as cf:
+            blob = cf.read()
+        nonce = blob[:12]
+        ciphertext = blob[12:]
+        aad = f"{upload_id}:{c['idx']}".encode()
+        try:
+            chunk_data = AESGCM(dek).decrypt(nonce, ciphertext, aad)
+        except Exception:
+            raise HTTPException(status_code=500, detail=f"Decryption failed for chunk {c['idx']}")
+        decrypted_bytes.extend(chunk_data)
+
+    display_name = upload["display_name"]
+    media_type, _ = mimetypes.guess_type(display_name)
+    if not media_type:
+        media_type = "application/octet-stream"
+
+    disposition = "inline" if inline else f'attachment; filename="{display_name}"'
+    return Response(
+        content=bytes(decrypted_bytes),
+        media_type=media_type,
+        headers={"Content-Disposition": disposition}
+    )
 
 # --- System Status & OTA Update Engine ---
 
