@@ -743,6 +743,16 @@
               <div><strong>Session ID:</strong> <span class="code-text" id="sess-id-display"></span></div>
               <div><strong>Workspace Path:</strong> <span class="code-text" id="sess-path-display"></span></div>
               <div><strong>Status:</strong> <span class="badge badge-emerald">Active Customer Working</span></div>
+
+              <div style="margin-top: 1rem; border-top: 1px solid var(--card-border); padding-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <strong style="color: #10b981;">📂 Delivered Workspace Documents (<span id="sess-files-count">0</span>):</strong>
+                  <button class="btn btn-secondary btn-sm" onclick="loadSessions()">🔄 Refresh Workspace</button>
+                </div>
+                <div id="sess-files-list" style="background: rgba(0,0,0,0.4); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem;">
+                  <span style="color: var(--text-muted);">No documents delivered to workspace yet. Click '💻 Deliver to Kiosk' in Customer Drops Inbox.</span>
+                </div>
+              </div>
             </div>
 
             <!-- Red Obliteration Button -->
@@ -1608,6 +1618,27 @@
 
           document.getElementById('sess-id-display').textContent = activeSession.id;
           document.getElementById('sess-path-display').textContent = activeSession.workspace_path;
+
+          const files = activeSession.files || [];
+          document.getElementById('sess-files-count').textContent = files.length;
+          const filesContainer = document.getElementById('sess-files-list');
+          if (files.length === 0) {
+            filesContainer.innerHTML = '<span style="color: var(--text-muted);">No documents delivered to workspace yet. Click "💻 Deliver to Kiosk" in Customer Drops Inbox.</span>';
+          } else {
+            filesContainer.innerHTML = files.map(f => {
+              const sizeKb = (f.size / 1024).toFixed(1) + ' KB';
+              return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; margin-bottom: 0.4rem;">
+                  <div>
+                    <strong style="color: #60a5fa;">📄 ${escapeHtml(f.name)}</strong>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(${sizeKb})</span>
+                    <div style="font-size: 0.72rem; color: #9ca3af; margin-top: 2px;">Path: <span class="code-text">${escapeHtml(f.path)}</span></div>
+                  </div>
+                  <span class="badge badge-emerald">Ready in Workspace</span>
+                </div>
+              `;
+            }).join('');
+          }
         } else {
           activeBadge.className = 'badge badge-rose';
           activeBadge.textContent = 'No Active Session';
@@ -1673,7 +1704,8 @@
           throw new Error(err.detail || 'Delivery failed');
         }
         const data = await res.json();
-        showToast(`Delivered '${data.file_name}' to workspace!`, 'success');
+        showToast(`Delivered '${data.file_name}' to kiosk workspace!`, 'success');
+        loadSessions();
       } catch (err) {
         showToast(err.message, 'error');
       }

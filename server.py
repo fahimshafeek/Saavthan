@@ -847,13 +847,26 @@ async def list_sessions(staff: dict = Depends(require_staff)):
     sessions = conn.execute("SELECT id, workspace_path, status, started_at, ended_at FROM sessions ORDER BY started_at DESC LIMIT 50").fetchall()
     pending = {r["session_id"] for r in conn.execute("SELECT session_id FROM pending_wipes").fetchall()}
     conn.close()
-    return [
-        {
-            **dict(s),
-            "has_pending_wipe": s["id"] in pending
-        }
-        for s in sessions
-    ]
+
+    results = []
+    for s in sessions:
+        d = dict(s)
+        d["has_pending_wipe"] = s["id"] in pending
+        files = []
+        ws_path = Path(s["workspace_path"])
+        if s["status"] == "active" and ws_path.exists():
+            for f in ws_path.glob("*"):
+                if f.is_file():
+                    files.append({
+                        "name": f.name,
+                        "size": f.stat().st_size,
+                        "modified_at": f.stat().st_mtime,
+                        "path": str(f)
+                    })
+        d["files"] = files
+        results.append(d)
+
+    return results
 
 @app.get("/api/v1/uploads")
 async def list_uploads(staff: dict = Depends(require_staff)):
