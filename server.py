@@ -647,8 +647,11 @@ async def close_drop(code: str, staff: dict = Depends(require_staff)):
 # --- Public Customer Portal Upload Endpoints ---
 
 @app.get("/upload", response_class=HTMLResponse)
+@app.get("/p", response_class=HTMLResponse)
+@app.get("/p/", response_class=HTMLResponse)
 @app.get("/p/{code}")
 @app.get("/p/{code}/upload")
+@app.get("/{slug}/upload", response_class=HTMLResponse)
 @app.get("/{slug}/d/{code}")
 @app.get("/{slug}/d/{code}/upload")
 async def get_drop_info(request: Request, code: Optional[str] = None, slug: Optional[str] = None):

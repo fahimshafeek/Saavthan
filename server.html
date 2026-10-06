@@ -995,11 +995,14 @@
       document.getElementById('app-header-subtitle').textContent = 'Secure Cryptographic Document Deposit';
 
       try {
-        const res = await fetch(`/p/${encodeURIComponent(code)}`, {
+        const path = window.location.pathname;
+        const fetchUrl = (code && code.length >= 4) ? `/p/${encodeURIComponent(code)}` : (path && path !== '/' ? path : '/upload');
+        const res = await fetch(fetchUrl, {
           headers: {'Accept': 'application/json'}
         });
         if (!res.ok) {
-          throw new Error('Drop not found, expired, or already closed.');
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || 'Drop not found, expired, or already closed.');
         }
         activeDrop = await res.json();
         renderPortalDropInfo();
