@@ -911,9 +911,10 @@ async def deliver_file_to_workspace(session_id: str, upload_id: str, staff: dict
         raise HTTPException(status_code=404, detail="Active session not found")
 
     upload = conn.execute("SELECT * FROM uploads WHERE id = ? AND status = 'verified'", (upload_id,)).fetchone()
-    if not upload:
+    upload_dir = STAGING_DIR / upload_id
+    if not upload or upload["status"] == "wiped" or not upload["dek_b64"] or not upload_dir.exists() or not any(upload_dir.iterdir()):
         conn.close()
-        raise HTTPException(status_code=404, detail="Verified upload not found")
+        raise HTTPException(status_code=404, detail="Upload staged data has been wiped or purged")
 
     chunks = conn.execute("SELECT idx, sha256 FROM chunks WHERE upload_id = ? ORDER BY idx ASC", (upload_id,)).fetchall()
     dek = unb64u(upload["dek_b64"])
@@ -1011,6 +1012,8 @@ async def list_uploads(staff: dict = Depends(require_staff)):
     results = []
     for r in rows:
         d = dict(r)
+        upload_dir = STAGING_DIR / d["id"]
+        d["is_staged_available"] = upload_dir.exists() and any(upload_dir.iterdir()) and d["status"] != "wiped"
         if d.get("receipt_json"):
             d["receipt"] = json.loads(d["receipt_json"])
         else:
@@ -1019,6 +1022,46 @@ async def list_uploads(staff: dict = Depends(require_staff)):
         results.append(d)
     return results
 
+@app.delete("/api/v1/uploads/{upload_id}")
+@app.post("/api/v1/uploads/{upload_id}/purge")
+async def purge_upload_staging(upload_id: str, staff: dict = Depends(require_staff)):
+    """Wipes staged chunk files for a given upload and crypto-shreds its DEK."""
+    upload_dir = STAGING_DIR / upload_id
+    if upload_dir.exists():
+        shutil.rmtree(upload_dir, ignore_errors=True)
+
+    conn = get_db()
+    with conn:
+        conn.execute("UPDATE uploads SET status = 'wiped', dek_b64 = '' WHERE id = ?", (upload_id,))
+    conn.close()
+
+    return {"status": "purged", "upload_id": upload_id}
+
+@app.post("/api/v1/uploads/purge-expired")
+async def purge_expired_uploads(staff: dict = Depends(require_staff)):
+    """Purges staging files for all uploads belonging to closed or expired drops."""
+    conn = get_db()
+    now = time.time()
+    rows = conn.execute("""
+        SELECT u.id
+        FROM uploads u
+        JOIN drops d ON u.drop_code = d.code
+        WHERE d.expires_at < ? OR d.status = 'closed' OR u.status = 'wiped'
+    """, (now,)).fetchall()
+
+    purged_count = 0
+    with conn:
+        for r in rows:
+            upload_id = r["id"]
+            upload_dir = STAGING_DIR / upload_id
+            if upload_dir.exists():
+                shutil.rmtree(upload_dir, ignore_errors=True)
+                purged_count += 1
+            conn.execute("UPDATE uploads SET status = 'wiped', dek_b64 = '' WHERE id = ?", (upload_id,))
+    conn.close()
+
+    return {"status": "ok", "purged_count": purged_count}
+
 @app.get("/api/v1/uploads/{upload_id}/download")
 async def download_upload_file(
     upload_id: str,
@@ -1026,15 +1069,15 @@ async def download_upload_file(
     staff: dict = Depends(require_staff)
 ):
     """
-    Decrypts verified upload chunks on-the-fly and returns the plaintext file
-    for staff members (e.g. Akshaya center operators) to view, download, or forward.
-    Requires valid staff Bearer token.
+    Decrypts verified upload chunks on-the-fly and returns the plaintext file.
+    Requires valid staff Bearer token and active staged chunks.
     """
     conn = get_db()
     upload = conn.execute("SELECT * FROM uploads WHERE id = ? AND status = 'verified'", (upload_id,)).fetchone()
-    if not upload:
+    upload_dir = STAGING_DIR / upload_id
+    if not upload or upload["status"] == "wiped" or not upload["dek_b64"] or not upload_dir.exists() or not any(upload_dir.iterdir()):
         conn.close()
-        raise HTTPException(status_code=404, detail="Verified upload not found")
+        raise HTTPException(status_code=404, detail="Upload staged data has been wiped or purged")
 
     chunks = conn.execute("SELECT idx, sha256 FROM chunks WHERE upload_id = ? ORDER BY idx ASC", (upload_id,)).fetchall()
     dek = unb64u(upload["dek_b64"])

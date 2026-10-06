@@ -700,7 +700,10 @@
         <div class="panel">
           <div class="panel-header">
             <div class="panel-title">📥 Uploaded Customer Documents (Verified & Encrypted at Rest)</div>
-            <button class="btn btn-secondary btn-sm" onclick="loadUploads()">🔄 Refresh Uploads</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-rose btn-sm" onclick="purgeExpiredUploads()">🧹 Purge Expired Staging</button>
+              <button class="btn btn-secondary btn-sm" onclick="loadUploads()">🔄 Refresh Uploads</button>
+            </div>
           </div>
           <div class="table-container">
             <table>
@@ -1573,6 +1576,17 @@
           const sizeKb = (u.declared_size / 1024).toFixed(1) + ' KB';
           const treeHash = u.tree_hash || 'N/A';
           const ackBadge = u.manager_ack_seq ? `<span class="badge badge-emerald">Ack #${u.manager_ack_seq}</span>` : `<span class="badge badge-amber">Local Notary</span>`;
+          const isStaged = u.is_staged_available && u.status !== 'wiped';
+          const statusBadge = isStaged 
+            ? `<span class="badge badge-emerald">${escapeHtml(u.status)}</span>` 
+            : `<span class="badge badge-rose">🗑️ Wiped / Purged</span>`;
+
+          const actionsCell = isStaged ? `
+            <button class="btn btn-emerald btn-sm" onclick="downloadUploadFile('${escapeHtml(u.id)}', '${escapeHtml(u.display_name)}', false)">📥 Download</button>
+            <button class="btn btn-slate btn-sm" onclick="downloadUploadFile('${escapeHtml(u.id)}', '${escapeHtml(u.display_name)}', true)">👁️ Preview</button>
+            <button class="btn btn-amber btn-sm" onclick="deliverUploadToWorkspace('${escapeHtml(u.id)}')">💻 Deliver to Kiosk</button>
+            <button class="btn btn-rose btn-sm" onclick="purgeSingleUpload('${escapeHtml(u.id)}')">🗑️ Purge</button>
+          ` : `<span style="color: var(--text-muted); font-size: 0.8rem;">Staging Purged</span>`;
 
           return `
             <tr>
@@ -1580,18 +1594,50 @@
               <td><span class="code-text">${escapeHtml(u.drop_code)}</span></td>
               <td>${sizeKb}</td>
               <td><span class="code-text" title="${treeHash}">${treeHash.slice(0, 16)}...</span></td>
-              <td><span class="badge badge-emerald">${escapeHtml(u.status)}</span></td>
+              <td>${statusBadge}</td>
               <td>${ackBadge}</td>
-              <td style="display: flex; gap: 6px; flex-wrap: wrap;">
-                <button class="btn btn-emerald btn-sm" onclick="downloadUploadFile('${escapeHtml(u.id)}', '${escapeHtml(u.display_name)}', false)">📥 Download</button>
-                <button class="btn btn-slate btn-sm" onclick="downloadUploadFile('${escapeHtml(u.id)}', '${escapeHtml(u.display_name)}', true)">👁️ Preview</button>
-                <button class="btn btn-amber btn-sm" onclick="deliverUploadToWorkspace('${escapeHtml(u.id)}')">💻 Deliver to Kiosk</button>
-              </td>
+              <td style="display: flex; gap: 6px; flex-wrap: wrap;">${actionsCell}</td>
             </tr>
           `;
         }).join('');
       } catch (err) {
         console.error('Uploads error:', err);
+      }
+    }
+
+    async function purgeSingleUpload(uploadId) {
+      if (!confirm('Are you sure you want to wipe this customer file from staging disk? Receipts will remain.')) return;
+      try {
+        const res = await fetch(`/api/v1/uploads/${uploadId}/purge`, {
+          method: 'POST',
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (res.ok) {
+          showToast('Customer upload staged files wiped from disk!', 'success');
+          loadUploads();
+        } else {
+          showToast('Failed to purge upload staging', 'error');
+        }
+      } catch (err) {
+        showToast('Error purging upload staging', 'error');
+      }
+    }
+
+    async function purgeExpiredUploads() {
+      try {
+        const res = await fetch('/api/v1/uploads/purge-expired', {
+          method: 'POST',
+          headers: {'Authorization': `Bearer ${staffToken}`}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          showToast(`Purged staging for ${data.purged_count} expired/closed uploads!`, 'success');
+          loadUploads();
+        } else {
+          showToast('Failed to purge expired uploads', 'error');
+        }
+      } catch (err) {
+        showToast('Error purging expired uploads', 'error');
       }
     }
 
