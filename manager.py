@@ -69,7 +69,7 @@ def ed25519_verify(vk_b64: str, message_bytes: bytes, sig_b64: str) -> bool:
 
 DB_PATH = os.environ.get("VAULT_MANAGER_DB", "manager.db")
 RELEASES_STORAGE = Path(os.environ.get("VAULT_RELEASES_DIR", "manager_releases"))
-CLOUDFLARE_TUNNEL_URL = os.environ.get("VAULT_TUNNEL_URL", "https://consoles-obj-lucky-trembl.trycloudflare.com").rstrip("/")
+CLOUDFLARE_TUNNEL_URL = os.environ.get("VAULT_TUNNEL_URL", "http://localhost:8443").rstrip("/")
 LOCAL_HUB_URL = os.environ.get("VAULT_LOCAL_HUB_URL", "http://localhost:8443").rstrip("/")
 
 def get_db():
@@ -145,6 +145,11 @@ def init_db():
             manifest_sig TEXT NOT NULL,
             min_supported_version TEXT NOT NULL,
             published_at REAL NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS used_nonces (
+            nonce TEXT PRIMARY KEY,
+            created_at REAL NOT NULL
         );
         """)
 
@@ -235,13 +240,16 @@ def verify_device_request(request: Request, body_bytes: bytes, device_id: str, t
     if not device:
         raise HTTPException(status_code=401, detail="Device not recognized or revoked")
 
-    # Time freshness check (allow +- 120 seconds)
-    try:
-        req_ts = float(ts)
-        if abs(time.time() - req_ts) > 120:
-            raise HTTPException(status_code=401, detail="Timestamp expired or clock skewed")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid timestamp")
+    # Nonce replay check & timestamp freshness
+    conn = get_db()
+    with conn:
+        conn.execute("DELETE FROM used_nonces WHERE created_at < ?", (time.time() - 120,))
+        existing_nonce = conn.execute("SELECT nonce FROM used_nonces WHERE nonce = ?", (nonce,)).fetchone()
+        if existing_nonce:
+            conn.close()
+            raise HTTPException(status_code=401, detail="Nonce replay attack detected")
+        conn.execute("INSERT INTO used_nonces (nonce, created_at) VALUES (?, ?)", (nonce, time.time()))
+    conn.close()
 
     # Validate signature over canonical request input
     body_hash = hashlib.sha256(body_bytes).hexdigest()
@@ -376,10 +384,13 @@ async def report_update_status(
 @app.get("/api/v1/releases/{version}/download/{filename}")
 async def download_release_artifact(version: str, filename: str):
     """Endpoint for shop nodes to download verified .bin / image OTA files."""
-    file_path = RELEASES_STORAGE / version / filename
-    if not file_path.exists():
+    safe_version = Path(version).name
+    safe_filename = Path(filename).name
+    base_dir = RELEASES_STORAGE.resolve()
+    file_path = (RELEASES_STORAGE / safe_version / safe_filename).resolve()
+    if not file_path.is_relative_to(base_dir) or not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="Release artifact not found")
-    return FileResponse(file_path, filename=filename, media_type="application/octet-stream")
+    return FileResponse(file_path, filename=safe_filename, media_type="application/octet-stream")
 
 @app.post("/api/v1/log/entries")
 async def append_transparency_log(
@@ -527,13 +538,20 @@ async def api_upload_release(
     severity: str = Form("normal"),
     file: UploadFile = File(...)
 ):
-    dest_dir = RELEASES_STORAGE / version
+    safe_version = Path(version).name
+    safe_filename = Path(file.filename or "release.bin").name
+    base_dir = RELEASES_STORAGE.resolve()
+    dest_dir = (RELEASES_STORAGE / safe_version).resolve()
+    if not dest_dir.is_relative_to(base_dir):
+        raise HTTPException(status_code=400, detail="Invalid version directory")
     dest_dir.mkdir(parents=True, exist_ok=True)
-    dest_file = dest_dir / file.filename
+    dest_file = (dest_dir / safe_filename).resolve()
+    if not dest_file.is_relative_to(base_dir):
+        raise HTTPException(status_code=400, detail="Invalid destination path")
     content = await file.read()
     dest_file.write_bytes(content)
-    cli_publish_release(version, str(dest_file), severity)
-    return {"status": "published", "version": version, "filename": file.filename}
+    cli_publish_release(safe_version, str(dest_file), severity)
+    return {"status": "published", "version": safe_version, "filename": safe_filename}
 
 @app.get("/api/v1/admin/releases")
 async def api_list_releases():

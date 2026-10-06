@@ -1,5 +1,7 @@
 # Databases & Runtime Data (contains private keys, token hashes, user password hashes)
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 data_server/
@@ -32,3 +34,6 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Generated Analysis
+Dossier.md

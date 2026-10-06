@@ -18,6 +18,7 @@ import io
 import json
 import mimetypes
 import os
+import secrets
 import shutil
 import sqlite3
 import sys
@@ -33,7 +34,7 @@ import httpx
 import uvicorn
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
@@ -59,9 +60,26 @@ WORKSPACES_DIR = DATA_DIR / "workspaces"
 IMAGES_DIR = DATA_DIR / "images"
 
 DEFAULT_CHUNK_SIZE = 8 * 1024 * 1024  # 8 MiB default
-SERVER_PEPPER = os.environ.get("VAULT_PASSWORD_PEPPER", "vault_secret_server_pepper_32bytes!").encode()
-CLOUDFLARE_TUNNEL_URL = os.environ.get("VAULT_TUNNEL_URL", "https://consoles-obj-lucky-trembl.trycloudflare.com").rstrip("/")
-VANITY_DOMAIN = os.environ.get("VAULT_VANITY_DOMAIN", "vault.laddu.cc").rstrip("/")
+
+def _get_server_pepper() -> bytes:
+    env_pepper = os.environ.get("VAULT_PASSWORD_PEPPER")
+    if env_pepper:
+        return env_pepper.encode("utf-8")
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    pepper_file = DATA_DIR / ".pepper"
+    if pepper_file.exists():
+        return pepper_file.read_bytes()
+    new_pepper = secrets.token_bytes(32)
+    pepper_file.write_bytes(new_pepper)
+    try:
+        os.chmod(pepper_file, 0o600)
+    except Exception:
+        pass
+    return new_pepper
+
+SERVER_PEPPER = _get_server_pepper()
+CLOUDFLARE_TUNNEL_URL = os.environ.get("VAULT_TUNNEL_URL", "http://localhost:8443").rstrip("/")
+VANITY_DOMAIN = os.environ.get("VAULT_VANITY_DOMAIN", "localhost:8443").rstrip("/")
 
 # --- Cryptographic Helpers ---
 
@@ -615,7 +633,27 @@ async def upload_chunk(
         conn.close()
         raise HTTPException(status_code=404, detail="Upload session not active")
 
+    if idx < 0 or idx >= upload["total_chunks"]:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Invalid chunk index")
+
+    drop = conn.execute("SELECT max_bytes FROM drops WHERE code = ?", (code,)).fetchone()
     data = await request.body()
+
+    max_chunk_size = upload["chunk_size"] * 2
+    if len(data) > max_chunk_size:
+        conn.close()
+        raise HTTPException(status_code=400, detail=f"Chunk size exceeds allowed limit of {max_chunk_size} bytes")
+
+    existing_total = conn.execute(
+        "SELECT COALESCE(SUM(size), 0) as total FROM chunks WHERE upload_id = ? AND idx != ?",
+        (upload_id, idx)
+    ).fetchone()["total"]
+
+    if drop and (existing_total + len(data)) > drop["max_bytes"]:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Total uploaded size exceeds drop maximum allowance")
+
     computed_digest = hashlib.sha256(data).hexdigest()
     if not hmac.compare_digest(computed_digest.lower(), x_chunk_sha256.lower()):
         conn.close()
@@ -911,21 +949,20 @@ async def download_upload_file(
     dek = unb64u(upload["dek_b64"])
     conn.close()
 
-    decrypted_bytes = bytearray()
-    for c in chunks:
-        chunk_file = STAGING_DIR / upload_id / f"{c['idx']}.chunk"
-        if not chunk_file.exists():
-            raise HTTPException(status_code=500, detail=f"Missing chunk file index {c['idx']}")
-        with open(chunk_file, "rb") as cf:
-            blob = cf.read()
-        nonce = blob[:12]
-        ciphertext = blob[12:]
-        aad = f"{upload_id}:{c['idx']}".encode()
-        try:
-            chunk_data = AESGCM(dek).decrypt(nonce, ciphertext, aad)
-        except Exception:
-            raise HTTPException(status_code=500, detail=f"Decryption failed for chunk {c['idx']}")
-        decrypted_bytes.extend(chunk_data)
+    def chunk_generator():
+        for c in chunks:
+            chunk_file = STAGING_DIR / upload_id / f"{c['idx']}.chunk"
+            if not chunk_file.exists():
+                raise HTTPException(status_code=500, detail=f"Missing chunk file index {c['idx']}")
+            with open(chunk_file, "rb") as cf:
+                blob = cf.read()
+            nonce = blob[:12]
+            ciphertext = blob[12:]
+            aad = f"{upload_id}:{c['idx']}".encode()
+            try:
+                yield AESGCM(dek).decrypt(nonce, ciphertext, aad)
+            except Exception:
+                raise HTTPException(status_code=500, detail=f"Decryption failed for chunk {c['idx']}")
 
     display_name = upload["display_name"]
     media_type, _ = mimetypes.guess_type(display_name)
@@ -933,8 +970,8 @@ async def download_upload_file(
         media_type = "application/octet-stream"
 
     disposition = "inline" if inline else f'attachment; filename="{display_name}"'
-    return Response(
-        content=bytes(decrypted_bytes),
+    return StreamingResponse(
+        chunk_generator(),
         media_type=media_type,
         headers={"Content-Disposition": disposition}
     )

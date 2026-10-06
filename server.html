@@ -1435,13 +1435,13 @@
         const data = await res.json();
 
         const slug = data.cafe_slug || 'local';
-        const tunnelBase = 'https://consoles-obj-lucky-trembl.trycloudflare.com';
+        const tunnelBase = window.location.origin;
         document.getElementById('node-slug-display').textContent = slug;
         document.getElementById('node-device-display').textContent = data.device_id ? data.device_id.slice(0, 8) + '...' : 'Not Enrolled';
         document.getElementById('node-image-display').textContent = `${data.active_image_file} (v${data.image_version})`;
         document.getElementById('node-vanity-display').innerHTML = `
-          <a href="${tunnelBase}/${slug}/d/" target="_blank" style="color: #10b981; text-decoration: none; font-size: 0.85rem;">${tunnelBase.replace('https://', '')}/${slug}/d/... ↗</a>
-          <div style="font-size: 0.72rem; color: #9ca3af; margin-top: 2px;">Custom: vault.laddu.cc/${slug} (pointing to tunnel)</div>
+          <a href="${tunnelBase}/${slug}/d/" target="_blank" style="color: #10b981; text-decoration: none; font-size: 0.85rem;">${tunnelBase}/${slug}/d/... ↗</a>
+          <div style="font-size: 0.72rem; color: #9ca3af; margin-top: 2px;">Custom Endpoint (local/tunnel)</div>
         `;
 
         document.getElementById('ota-image-file').textContent = data.active_image_file;
@@ -1470,7 +1470,7 @@
           const isExpired = d.expires_at < now || d.status !== 'open';
           const minsLeft = Math.max(0, Math.floor((d.expires_at - now) / 60));
           const maxMb = (d.max_bytes / (1024 * 1024)).toFixed(0) + ' MB';
-          const tunnelUrl = d.upload_tunnel_url || d.tunnel_url || `https://consoles-obj-lucky-trembl.trycloudflare.com/${d.cafe_slug || 'local'}/d/${d.code}/upload`;
+          const tunnelUrl = d.upload_tunnel_url || d.tunnel_url || `${window.location.origin}/${d.cafe_slug || 'local'}/d/${d.code}/upload`;
 
           return `
             <tr>
@@ -1914,7 +1914,7 @@
     let currentQRUrl = '';
 
     function openQRModal(code, uploadUrl, label) {
-      currentQRUrl = uploadUrl || `https://consoles-obj-lucky-trembl.trycloudflare.com/local/d/${code}/upload`;
+      currentQRUrl = uploadUrl || `${window.location.origin}/p/${code}/upload`;
       document.getElementById('qr-modal-label').textContent = label || `Customer Mobile Drop (${code})`;
       document.getElementById('qr-modal-url').textContent = currentQRUrl;
 
