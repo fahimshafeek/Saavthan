@@ -18,10 +18,13 @@ import io
 import json
 import mimetypes
 import os
+import re
 import secrets
 import shutil
 import sqlite3
+import subprocess
 import sys
+import threading
 import time
 import qrcode
 import qrcode.image.svg
@@ -292,13 +295,101 @@ def execute_wipe_on_boot():
     if pending:
         print(f"[Wipe-on-Boot] Obliterated {len(pending)} un-wiped ephemeral workspaces.")
 
+# --- Cloudflare Tunnel Subprocess Manager ---
+
+class CloudflareTunnelManager:
+    def __init__(self, target_port: int = 8443):
+        self.target_port = target_port
+        self.process: Optional[subprocess.Popen] = None
+        self.tunnel_url: Optional[str] = None
+        self._stop_event = threading.Event()
+
+    def start(self):
+        cloudflared_bin = shutil.which("cloudflared")
+        if not cloudflared_bin:
+            print("[Cloudflare Tunnel] 'cloudflared' binary not found on PATH. Skipping auto-tunnel.")
+            return
+
+        token = os.environ.get("VAULT_TUNNEL_TOKEN") or os.environ.get("CLOUDFLARE_TUNNEL_TOKEN")
+        if token:
+            cmd = [cloudflared_bin, "tunnel", "run", "--token", token]
+        else:
+            cmd = [cloudflared_bin, "tunnel", "--url", f"http://localhost:{self.target_port}"]
+
+        try:
+            self.process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+
+            url_pattern = re.compile(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com")
+
+            def monitor_output():
+                global CLOUDFLARE_TUNNEL_URL
+                if not self.process or not self.process.stdout:
+                    return
+                for line in iter(self.process.stdout.readline, ""):
+                    if self._stop_event.is_set():
+                        break
+                    match = url_pattern.search(line)
+                    if match and not self.tunnel_url:
+                        self.tunnel_url = match.group(0).rstrip("/")
+                        CLOUDFLARE_TUNNEL_URL = self.tunnel_url
+                        print("\n" + "=" * 60)
+                        print("🚀 LIVE CLOUDFLARE TUNNEL SPUN UP AUTOMATICALLY!")
+                        print(f"🔗 Active Tunnel URL: {self.tunnel_url}")
+                        print("=" * 60 + "\n")
+
+            t = threading.Thread(target=monitor_output, daemon=True)
+            t.start()
+
+            # Wait briefly (up to 6s) for trycloudflare URL detection
+            start_time = time.time()
+            while time.time() - start_time < 6.0:
+                if self.tunnel_url:
+                    break
+                time.sleep(0.15)
+
+        except Exception as e:
+            print(f"[Cloudflare Tunnel] Failed to start cloudflared subprocess: {e}")
+
+    def stop(self):
+        self._stop_event.set()
+        if self.process:
+            print("[Cloudflare Tunnel] Terminating subprocess...")
+            try:
+                self.process.terminate()
+                self.process.wait(timeout=2.5)
+            except Exception:
+                try:
+                    self.process.kill()
+                except Exception:
+                    pass
+            self.process = None
+
+_tunnel_manager: Optional[CloudflareTunnelManager] = None
+
 # --- FastAPI App & Lifespan ---
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _tunnel_manager
     init_server_db()
     execute_wipe_on_boot()
+
+    if os.environ.get("VAULT_AUTO_TUNNEL", "1").lower() not in ("0", "false", "no"):
+        port = int(os.environ.get("VAULT_PORT", "8443"))
+        _tunnel_manager = CloudflareTunnelManager(target_port=port)
+        _tunnel_manager.start()
+
     yield
+
+    if _tunnel_manager:
+        _tunnel_manager.stop()
+        _tunnel_manager = None
 
 app = FastAPI(title="Vault Service Provider Node", version="1.0.0-mvp", lifespan=lifespan)
 security = HTTPBearer(auto_error=False)
@@ -1274,6 +1365,7 @@ def main():
     serve_parser.add_argument("--host", default="0.0.0.0")
     serve_parser.add_argument("--port", type=int, default=8443)
     serve_parser.add_argument("--reload", action="store_true", help="Auto-reload on file changes")
+    serve_parser.add_argument("--no-tunnel", action="store_true", help="Disable automatic Cloudflare Tunnel startup")
 
     # bootstrap
     boot_parser = subparsers.add_parser("bootstrap", help="Create first-time owner account")
@@ -1299,6 +1391,9 @@ def main():
     args = parser.parse_args()
 
     if args.command == "serve":
+        os.environ["VAULT_PORT"] = str(args.port)
+        if args.no_tunnel:
+            os.environ["VAULT_AUTO_TUNNEL"] = "0"
         init_server_db()
         execute_wipe_on_boot()
         uvicorn.run("server:app", host=args.host, port=args.port, reload=args.reload)
