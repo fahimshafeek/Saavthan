@@ -14,6 +14,7 @@ import argparse
 import base64
 import hashlib
 import hmac
+import io
 import json
 import mimetypes
 import os
@@ -21,6 +22,8 @@ import shutil
 import sqlite3
 import sys
 import time
+import qrcode
+import qrcode.image.svg
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -443,134 +446,13 @@ async def list_users(staff: dict = Depends(require_staff)):
 class QRCodeGenerator:
     def __init__(self, text: str):
         self.text = text
-        self.data_bytes = text.encode('utf-8')
-        if len(self.data_bytes) <= 32:
-            self.version = 3; self.size = 29; self.data_cap = 44; self.ecc_cap = 26
-        elif len(self.data_bytes) <= 62:
-            self.version = 5; self.size = 37; self.data_cap = 84; self.ecc_cap = 50
-        elif len(self.data_bytes) <= 106:
-            self.version = 7; self.size = 45; self.data_cap = 136; self.ecc_cap = 72
-        else:
-            self.version = 10; self.size = 57; self.data_cap = 216; self.ecc_cap = 112
-
-        self.grid = [[None]*self.size for _ in range(self.size)]
-        self.reserved = [[False]*self.size for _ in range(self.size)]
-        self._init_gf()
-
-    def _init_gf(self):
-        self.exp = [1] * 512
-        self.log = [0] * 256
-        x = 1
-        for i in range(255):
-            self.exp[i] = x
-            self.exp[i + 255] = x
-            self.log[x] = i
-            x <<= 1
-            if x & 256: x ^= 285
-
-    def gmul(self, x, y):
-        if x == 0 or y == 0: return 0
-        return self.exp[self.log[x] + self.log[y]]
-
-    def poly_mul(self, p1, p2):
-        res = [0] * (len(p1) + len(p2) - 1)
-        for i, c1 in enumerate(p1):
-            for j, c2 in enumerate(p2):
-                res[i + j] ^= self.gmul(c1, c2)
-        return res
-
-    def rs_encode(self, data, ecc_len):
-        gen = [1]
-        for i in range(ecc_len):
-            gen = self.poly_mul(gen, [1, self.exp[i]])
-        res = list(data) + [0] * ecc_len
-        for i in range(len(data)):
-            coef = res[i]
-            if coef != 0:
-                for j in range(len(gen)):
-                    res[i + j] ^= self.gmul(gen[j], coef)
-        return res[len(data):]
-
-    def _add_finder(self, r, c):
-        for dr in range(7):
-            for dc in range(7):
-                is_black = (dr == 0 or dr == 6 or dc == 0 or dc == 6 or (2 <= dr <= 4 and 2 <= dc <= 4))
-                self.grid[r+dr][c+dc] = 1 if is_black else 0
-                self.reserved[r+dr][c+dc] = True
 
     def generate_svg(self) -> str:
-        self._add_finder(0, 0)
-        self._add_finder(0, self.size - 7)
-        self._add_finder(self.size - 7, 0)
-
-        for i in range(9):
-            self.reserved[8][i] = True
-            self.reserved[i][8] = True
-            self.reserved[8][self.size - 1 - i] = True
-            self.reserved[self.size - 1 - i][8] = True
-
-        for i in range(8, self.size - 8):
-            self.grid[6][i] = 1 if i % 2 == 0 else 0
-            self.reserved[6][i] = True
-            self.grid[i][6] = 1 if i % 2 == 0 else 0
-            self.reserved[i][6] = True
-
-        bits = '0100' + format(len(self.data_bytes), '08b')
-        for b in self.data_bytes:
-            bits += format(b, '08b')
-        bits += '0000'
-        while len(bits) % 8 != 0:
-            bits += '0'
-
-        raw_bytes = bytearray()
-        for i in range(0, len(bits), 8):
-            raw_bytes.append(int(bits[i:i+8], 2))
-
-        pad = [0xEC, 0x11]
-        pad_idx = 0
-        while len(raw_bytes) < self.data_cap:
-            raw_bytes.append(pad[pad_idx])
-            pad_idx = (pad_idx + 1) % 2
-
-        ecc_bytes = self.rs_encode(raw_bytes, self.ecc_cap)
-        all_bits = ''.join(format(b, '08b') for b in (raw_bytes + bytes(ecc_bytes)))
-
-        bit_idx = 0
-        col = self.size - 1
-        up = True
-        while col > 0:
-            if col == 6: col -= 1
-            for row in (range(self.size - 1, -1, -1) if up else range(self.size)):
-                for c in (col, col - 1):
-                    if not self.reserved[row][c]:
-                        if bit_idx < len(all_bits):
-                            val = int(all_bits[bit_idx])
-                            if (row + c) % 2 == 0:
-                                val ^= 1
-                            self.grid[row][c] = val
-                            bit_idx += 1
-                        else:
-                            self.grid[row][c] = 0
-            col -= 2
-            up = not up
-
-        fmt = [1,0,1,0,1,0,0,0,0,0,1,0,0,1,0]
-        for i in range(6): self.grid[8][i] = fmt[i]
-        self.grid[8][7] = fmt[6]
-        self.grid[8][8] = fmt[7]
-        self.grid[7][8] = fmt[8]
-        for i in range(6): self.grid[5-i][8] = fmt[9+i]
-        for i in range(8): self.grid[self.size - 1 - i][8] = fmt[i]
-        for i in range(7): self.grid[8][self.size - 7 + i] = fmt[8+i]
-
-        box = 6
-        dim = self.size * box
-        rects = []
-        for r in range(self.size):
-            for c in range(self.size):
-                if self.grid[r][c] == 1:
-                    rects.append(f'<rect x="{c*box}" y="{r*box}" width="{box}" height="{box}" fill="#10b981"/>')
-        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {dim} {dim}" width="280" height="280" style="background:#0b0f19; padding:12px; border-radius:12px;"><rect width="100%" height="100%" fill="#0b0f19"/>' + ''.join(rects) + '</svg>'
+        factory = qrcode.image.svg.SvgPathImage
+        img = qrcode.make(self.text, image_factory=factory, box_size=10, border=3)
+        stream = io.BytesIO()
+        img.save(stream)
+        return stream.getvalue().decode('utf-8')
 
 # --- Drop Management & Custom Endpoint Generation ---
 

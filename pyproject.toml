@@ -12,5 +12,6 @@ dependencies = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "python-multipart>=0.0.32",
+    "qrcode>=8.2",
     "uvicorn>=0.54.0",
 ]

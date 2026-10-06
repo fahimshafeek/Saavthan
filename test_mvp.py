@@ -618,7 +618,7 @@ async def test_ui_and_helper_endpoints(tmp_path):
         assert qr_res.status_code == 200
         assert "image/svg+xml" in qr_res.headers["content-type"]
         assert "<svg" in qr_res.text and "</svg>" in qr_res.text
-        assert "rect" in qr_res.text
+        assert "<path" in qr_res.text or "<rect" in qr_res.text
 
         # 8. Test list sessions & obliteration
         sess_res = await srv_client.post("/api/v1/session/start", headers=headers)
