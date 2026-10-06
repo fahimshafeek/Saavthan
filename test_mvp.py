@@ -579,7 +579,7 @@ async def test_ui_and_helper_endpoints(tmp_path):
             "ttl_minutes": 30
         }, headers=headers)
         drop_code = drop_res.json()["drop_code"]
-        assert "vocals-shakespeare-fragrance-distances.trycloudflare.com" in drop_res.json()["tunnel_url"]
+        assert "consoles-obj-lucky-trembl.trycloudflare.com" in drop_res.json()["tunnel_url"]
         assert "vault.laddu.cc" in drop_res.json()["vanity_url"]
 
         drops_list_res = await srv_client.get("/api/v1/drops", headers=headers)
@@ -663,11 +663,11 @@ async def test_ui_and_helper_endpoints(tmp_path):
         # 12. Test Manager mapping localhost:8000/<slug> to Cloudflare URL
         slug_res = await mgr_client.get("/mycafe1")
         assert slug_res.status_code == 307
-        assert slug_res.headers["location"] == "https://vocals-shakespeare-fragrance-distances.trycloudflare.com/mycafe1"
+        assert slug_res.headers["location"] == "https://consoles-obj-lucky-trembl.trycloudflare.com/mycafe1"
 
         slug_drop_res = await mgr_client.get(f"/mycafe1/d/{drop_code}")
         assert slug_drop_res.status_code == 307
-        assert slug_drop_res.headers["location"] == f"https://vocals-shakespeare-fragrance-distances.trycloudflare.com/mycafe1/d/{drop_code}"
+        assert slug_drop_res.headers["location"] == f"https://consoles-obj-lucky-trembl.trycloudflare.com/mycafe1/d/{drop_code}"
 
         # Test Server Hub UI serving directly on /{slug}
         srv_slug_res = await srv_client.get("/mycafe1")

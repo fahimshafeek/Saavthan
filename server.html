@@ -1422,7 +1422,7 @@
         const data = await res.json();
 
         const slug = data.cafe_slug || 'local';
-        const tunnelBase = 'https://vocals-shakespeare-fragrance-distances.trycloudflare.com';
+        const tunnelBase = 'https://consoles-obj-lucky-trembl.trycloudflare.com';
         document.getElementById('node-slug-display').textContent = slug;
         document.getElementById('node-device-display').textContent = data.device_id ? data.device_id.slice(0, 8) + '...' : 'Not Enrolled';
         document.getElementById('node-image-display').textContent = `${data.active_image_file} (v${data.image_version})`;
@@ -1457,7 +1457,7 @@
           const isExpired = d.expires_at < now || d.status !== 'open';
           const minsLeft = Math.max(0, Math.floor((d.expires_at - now) / 60));
           const maxMb = (d.max_bytes / (1024 * 1024)).toFixed(0) + ' MB';
-          const tunnelUrl = d.upload_tunnel_url || d.tunnel_url || `https://vocals-shakespeare-fragrance-distances.trycloudflare.com/${d.cafe_slug || 'local'}/d/${d.code}/upload`;
+          const tunnelUrl = d.upload_tunnel_url || d.tunnel_url || `https://consoles-obj-lucky-trembl.trycloudflare.com/${d.cafe_slug || 'local'}/d/${d.code}/upload`;
 
           return `
             <tr>
@@ -1849,7 +1849,7 @@
     let currentQRUrl = '';
 
     function openQRModal(code, uploadUrl, label) {
-      currentQRUrl = uploadUrl || `https://vocals-shakespeare-fragrance-distances.trycloudflare.com/local/d/${code}/upload`;
+      currentQRUrl = uploadUrl || `https://consoles-obj-lucky-trembl.trycloudflare.com/local/d/${code}/upload`;
       document.getElementById('qr-modal-label').textContent = label || `Customer Mobile Drop (${code})`;
       document.getElementById('qr-modal-url').textContent = currentQRUrl;
 

@@ -56,7 +56,7 @@ IMAGES_DIR = DATA_DIR / "images"
 
 DEFAULT_CHUNK_SIZE = 8 * 1024 * 1024  # 8 MiB default
 SERVER_PEPPER = os.environ.get("VAULT_PASSWORD_PEPPER", "vault_secret_server_pepper_32bytes!").encode()
-CLOUDFLARE_TUNNEL_URL = os.environ.get("VAULT_TUNNEL_URL", "https://vocals-shakespeare-fragrance-distances.trycloudflare.com").rstrip("/")
+CLOUDFLARE_TUNNEL_URL = os.environ.get("VAULT_TUNNEL_URL", "https://consoles-obj-lucky-trembl.trycloudflare.com").rstrip("/")
 VANITY_DOMAIN = os.environ.get("VAULT_VANITY_DOMAIN", "vault.laddu.cc").rstrip("/")
 
 # --- Cryptographic Helpers ---

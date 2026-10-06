@@ -69,7 +69,7 @@ def ed25519_verify(vk_b64: str, message_bytes: bytes, sig_b64: str) -> bool:
 
 DB_PATH = os.environ.get("VAULT_MANAGER_DB", "manager.db")
 RELEASES_STORAGE = Path(os.environ.get("VAULT_RELEASES_DIR", "manager_releases"))
-CLOUDFLARE_TUNNEL_URL = os.environ.get("VAULT_TUNNEL_URL", "https://vocals-shakespeare-fragrance-distances.trycloudflare.com").rstrip("/")
+CLOUDFLARE_TUNNEL_URL = os.environ.get("VAULT_TUNNEL_URL", "https://consoles-obj-lucky-trembl.trycloudflare.com").rstrip("/")
 LOCAL_HUB_URL = os.environ.get("VAULT_LOCAL_HUB_URL", "http://localhost:8443").rstrip("/")
 
 def get_db():
