@@ -885,6 +885,31 @@
           <button type="submit" class="btn btn-emerald">Complete Enrollment</button>
         </div>
       </form>
+  <!-- Modal: QR Code for Mobile Upload -->
+  <div id="qr-modal" class="modal-backdrop">
+    <div class="modal-box" style="text-align: center; max-width: 440px;">
+      <div style="font-size: 0.85rem; color: var(--emerald); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
+        📱 Scan with Mobile Camera
+      </div>
+      <h3 style="margin-bottom: 0.25rem;" id="qr-modal-label">Customer Mobile Drop</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+        Scan QR code below with your phone camera to land on the remote upload page.
+      </p>
+
+      <div id="qr-code-display-container" style="background: #0b0f19; padding: 1rem; border-radius: 12px; border: 1px solid var(--card-border); margin-bottom: 1.25rem; display: inline-block;">
+        <div id="qr-svg-wrapper"></div>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.3); padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.25rem; word-break: break-all; text-align: left;">
+        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Mobile Remote Upload Link (/upload):</div>
+        <div class="code-text" id="qr-modal-url" style="color: #60a5fa; font-size: 0.82rem; margin-top: 0.25rem;"></div>
+      </div>
+
+      <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="copyQRModalLink()">📋 Copy Link</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="printQRCard()">🖨️ Print Badge</button>
+        <button type="button" class="btn btn-emerald btn-sm" onclick="closeQRModal()">Done</button>
+      </div>
     </div>
   </div>
 
@@ -906,10 +931,24 @@
 
     async function initApp() {
       const path = window.location.pathname;
-      if (path.startsWith('/p/') || path.includes('/d/')) {
-        // Customer Portal Mode
+      if (path.startsWith('/p/') || path.includes('/d/') || path.endsWith('/upload') || path.includes('/upload')) {
+        // Customer Portal / Mobile Upload Mode
         const parts = path.split('/').filter(Boolean);
-        const code = parts[parts.length - 1];
+        let code = '';
+        const dIdx = parts.indexOf('d');
+        const pIdx = parts.indexOf('p');
+        if (dIdx !== -1 && parts.length > dIdx + 1) {
+          code = parts[dIdx + 1];
+        } else if (pIdx !== -1 && parts.length > pIdx + 1) {
+          code = parts[pIdx + 1];
+        } else {
+          for (const p of parts) {
+            if (p !== 'upload' && p !== 'p' && p !== 'd' && p.length >= 4) {
+              code = p;
+              break;
+            }
+          }
+        }
         initCustomerPortal(code);
       } else {
         // Staff Hub Mode
@@ -1418,7 +1457,7 @@
           const isExpired = d.expires_at < now || d.status !== 'open';
           const minsLeft = Math.max(0, Math.floor((d.expires_at - now) / 60));
           const maxMb = (d.max_bytes / (1024 * 1024)).toFixed(0) + ' MB';
-          const tunnelUrl = d.tunnel_url || `https://vocals-shakespeare-fragrance-distances.trycloudflare.com/${d.cafe_slug || 'local'}/d/${d.code}`;
+          const tunnelUrl = d.upload_tunnel_url || d.tunnel_url || `https://vocals-shakespeare-fragrance-distances.trycloudflare.com/${d.cafe_slug || 'local'}/d/${d.code}/upload`;
 
           return `
             <tr>
@@ -1427,20 +1466,23 @@
               <td>
                 <div style="margin-bottom: 0.25rem;">
                   <span class="code-text" style="color: #10b981;" title="${escapeHtml(tunnelUrl)}">${escapeHtml(tunnelUrl.slice(0, 42))}...</span>
-                  <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${escapeHtml(tunnelUrl)}'); showToast('Cloudflare tunnel link copied!', 'success');" title="Copy live TryCloudflare Link">📋</button>
+                  <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${escapeHtml(tunnelUrl)}'); showToast('Cloudflare mobile upload link copied!', 'success');" title="Copy live TryCloudflare Link">📋</button>
                 </div>
                 <div style="font-size: 0.75rem; color: #9ca3af;">
                   Custom: <span class="code-text" style="color: #60a5fa;">${escapeHtml(d.portal_url)}</span>
                 </div>
               </td>
               <td>
-                <a href="${escapeHtml(tunnelUrl)}" target="_blank" style="color: var(--emerald); text-decoration: none; font-weight: 600;">Open Live Portal ↗</a>
+                <a href="${escapeHtml(tunnelUrl)}" target="_blank" style="color: var(--emerald); text-decoration: none; font-weight: 600;">Open Upload Page ↗</a>
               </td>
               <td>${maxMb}</td>
               <td>${isExpired ? '<span class="badge badge-rose">Expired</span>' : `${minsLeft} min(s)`}</td>
               <td><span class="badge ${d.status === 'open' && !isExpired ? 'badge-emerald' : 'badge-rose'}">${escapeHtml(d.status)}</span></td>
               <td>
-                ${d.status === 'open' && !isExpired ? `<button class="btn btn-secondary btn-sm" onclick="closeDrop('${escapeHtml(d.code)}')">Revoke</button>` : '<span style="color:var(--text-muted);">-</span>'}
+                ${d.status === 'open' && !isExpired ? `
+                  <button class="btn btn-emerald btn-sm" onclick="openQRModal('${escapeHtml(d.code)}', '${escapeHtml(tunnelUrl)}', '${escapeHtml(d.label)}')">📱 QR Code</button>
+                  <button class="btn btn-secondary btn-sm" onclick="closeDrop('${escapeHtml(d.code)}')">Revoke</button>
+                ` : '<span style="color:var(--text-muted);">-</span>'}
               </td>
             </tr>
           `;
@@ -1469,10 +1511,17 @@
             ttl_minutes: ttl
           })
         });
-        if (!res.ok) throw new Error('Failed to generate drop endpoint');
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Failed to generate drop endpoint');
+        }
+        const data = await res.json();
         showToast('Secure Drop Endpoint Generated!', 'success');
         document.getElementById('create-drop-form').reset();
         loadDrops();
+
+        const uploadUrl = data.upload_tunnel_url || data.tunnel_url;
+        openQRModal(data.drop_code, uploadUrl, label);
       } catch (err) {
         showToast(err.message, 'error');
       }
@@ -1791,10 +1840,64 @@
         }
         showToast(`Staff member '${username}' created successfully!`, 'success');
         document.getElementById('create-user-form').reset();
-        loadUsers();
       } catch (err) {
         showToast(err.message, 'error');
       }
+    }
+
+    // QR Code Modal & Printing
+    let currentQRUrl = '';
+
+    function openQRModal(code, uploadUrl, label) {
+      currentQRUrl = uploadUrl || `https://vocals-shakespeare-fragrance-distances.trycloudflare.com/local/d/${code}/upload`;
+      document.getElementById('qr-modal-label').textContent = label || `Customer Mobile Drop (${code})`;
+      document.getElementById('qr-modal-url').textContent = currentQRUrl;
+
+      const qrWrapper = document.getElementById('qr-svg-wrapper');
+      qrWrapper.innerHTML = `<img src="/api/v1/drops/${encodeURIComponent(code)}/qr" style="width: 240px; height: 240px; border-radius: 8px;" alt="QR Code">`;
+
+      document.getElementById('qr-modal').classList.add('open');
+    }
+
+    function closeQRModal() {
+      document.getElementById('qr-modal').classList.remove('open');
+    }
+
+    function copyQRModalLink() {
+      if (!currentQRUrl) return;
+      navigator.clipboard.writeText(currentQRUrl);
+      showToast('Mobile Upload Link (/upload) copied to clipboard!', 'success');
+    }
+
+    function printQRCard() {
+      const w = window.open('', '_blank');
+      w.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Vault Mobile Drop - ${escapeHtml(document.getElementById('qr-modal-label').textContent)}</title>
+          <style>
+            body { font-family: system-ui, sans-serif; text-align: center; padding: 2rem; background: #fff; color: #000; }
+            .card { border: 2px solid #000; border-radius: 16px; padding: 2rem; max-width: 400px; margin: 0 auto; }
+            .badge { background: #10b981; color: #fff; padding: 4px 12px; border-radius: 99px; font-weight: bold; display: inline-block; margin-bottom: 1rem; }
+            h2 { margin: 0.5rem 0; font-size: 1.5rem; }
+            p { color: #555; font-size: 0.9rem; margin-bottom: 1.5rem; }
+            img { width: 240px; height: 240px; }
+            .url { font-family: monospace; font-size: 0.8rem; word-break: break-all; margin-top: 1rem; color: #333; }
+          </style>
+        </head>
+        <body onload="window.print()">
+          <div class="card">
+            <div class="badge">🔒 ZERO-RETENTION VAULT</div>
+            <h2>Scan to Upload Documents</h2>
+            <p>Point your mobile camera at this QR code to securely upload files directly to our counter.</p>
+            <div id="img-box">${document.getElementById('qr-svg-wrapper').innerHTML}</div>
+            <div class="url">${escapeHtml(currentQRUrl)}</div>
+          </div>
+        </body>
+        </html>
+      `);
+      w.document.close();
     }
 
     function escapeHtml(str) {

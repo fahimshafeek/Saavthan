@@ -437,6 +437,140 @@ async def list_users(staff: dict = Depends(require_staff)):
     conn.close()
     return [dict(r) for r in rows]
 
+# --- Standalone QR Code Generator ---
+
+class QRCodeGenerator:
+    def __init__(self, text: str):
+        self.text = text
+        self.data_bytes = text.encode('utf-8')
+        if len(self.data_bytes) <= 32:
+            self.version = 3; self.size = 29; self.data_cap = 44; self.ecc_cap = 26
+        elif len(self.data_bytes) <= 62:
+            self.version = 5; self.size = 37; self.data_cap = 84; self.ecc_cap = 50
+        elif len(self.data_bytes) <= 106:
+            self.version = 7; self.size = 45; self.data_cap = 136; self.ecc_cap = 72
+        else:
+            self.version = 10; self.size = 57; self.data_cap = 216; self.ecc_cap = 112
+
+        self.grid = [[None]*self.size for _ in range(self.size)]
+        self.reserved = [[False]*self.size for _ in range(self.size)]
+        self._init_gf()
+
+    def _init_gf(self):
+        self.exp = [1] * 512
+        self.log = [0] * 256
+        x = 1
+        for i in range(255):
+            self.exp[i] = x
+            self.exp[i + 255] = x
+            self.log[x] = i
+            x <<= 1
+            if x & 256: x ^= 285
+
+    def gmul(self, x, y):
+        if x == 0 or y == 0: return 0
+        return self.exp[self.log[x] + self.log[y]]
+
+    def poly_mul(self, p1, p2):
+        res = [0] * (len(p1) + len(p2) - 1)
+        for i, c1 in enumerate(p1):
+            for j, c2 in enumerate(p2):
+                res[i + j] ^= self.gmul(c1, c2)
+        return res
+
+    def rs_encode(self, data, ecc_len):
+        gen = [1]
+        for i in range(ecc_len):
+            gen = self.poly_mul(gen, [1, self.exp[i]])
+        res = list(data) + [0] * ecc_len
+        for i in range(len(data)):
+            coef = res[i]
+            if coef != 0:
+                for j in range(len(gen)):
+                    res[i + j] ^= self.gmul(gen[j], coef)
+        return res[len(data):]
+
+    def _add_finder(self, r, c):
+        for dr in range(7):
+            for dc in range(7):
+                is_black = (dr == 0 or dr == 6 or dc == 0 or dc == 6 or (2 <= dr <= 4 and 2 <= dc <= 4))
+                self.grid[r+dr][c+dc] = 1 if is_black else 0
+                self.reserved[r+dr][c+dc] = True
+
+    def generate_svg(self) -> str:
+        self._add_finder(0, 0)
+        self._add_finder(0, self.size - 7)
+        self._add_finder(self.size - 7, 0)
+
+        for i in range(9):
+            self.reserved[8][i] = True
+            self.reserved[i][8] = True
+            self.reserved[8][self.size - 1 - i] = True
+            self.reserved[self.size - 1 - i][8] = True
+
+        for i in range(8, self.size - 8):
+            self.grid[6][i] = 1 if i % 2 == 0 else 0
+            self.reserved[6][i] = True
+            self.grid[i][6] = 1 if i % 2 == 0 else 0
+            self.reserved[i][6] = True
+
+        bits = '0100' + format(len(self.data_bytes), '08b')
+        for b in self.data_bytes:
+            bits += format(b, '08b')
+        bits += '0000'
+        while len(bits) % 8 != 0:
+            bits += '0'
+
+        raw_bytes = bytearray()
+        for i in range(0, len(bits), 8):
+            raw_bytes.append(int(bits[i:i+8], 2))
+
+        pad = [0xEC, 0x11]
+        pad_idx = 0
+        while len(raw_bytes) < self.data_cap:
+            raw_bytes.append(pad[pad_idx])
+            pad_idx = (pad_idx + 1) % 2
+
+        ecc_bytes = self.rs_encode(raw_bytes, self.ecc_cap)
+        all_bits = ''.join(format(b, '08b') for b in (raw_bytes + bytes(ecc_bytes)))
+
+        bit_idx = 0
+        col = self.size - 1
+        up = True
+        while col > 0:
+            if col == 6: col -= 1
+            for row in (range(self.size - 1, -1, -1) if up else range(self.size)):
+                for c in (col, col - 1):
+                    if not self.reserved[row][c]:
+                        if bit_idx < len(all_bits):
+                            val = int(all_bits[bit_idx])
+                            if (row + c) % 2 == 0:
+                                val ^= 1
+                            self.grid[row][c] = val
+                            bit_idx += 1
+                        else:
+                            self.grid[row][c] = 0
+            col -= 2
+            up = not up
+
+        fmt = [1,0,1,0,1,0,0,0,0,0,1,0,0,1,0]
+        for i in range(6): self.grid[8][i] = fmt[i]
+        self.grid[8][7] = fmt[6]
+        self.grid[8][8] = fmt[7]
+        self.grid[7][8] = fmt[8]
+        for i in range(6): self.grid[5-i][8] = fmt[9+i]
+        for i in range(8): self.grid[self.size - 1 - i][8] = fmt[i]
+        for i in range(7): self.grid[8][self.size - 7 + i] = fmt[8+i]
+
+        box = 6
+        dim = self.size * box
+        rects = []
+        for r in range(self.size):
+            for c in range(self.size):
+                if self.grid[r][c] == 1:
+                    rects.append(f'<rect x="{c*box}" y="{r*box}" width="{box}" height="{box}" fill="#10b981"/>')
+        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {dim} {dim}" width="280" height="280" style="background:#0b0f19; padding:12px; border-radius:12px;"><rect width="100%" height="100%" fill="#0b0f19"/>' + ''.join(rects) + '</svg>'
+
 # --- Drop Management & Custom Endpoint Generation ---
 
 @app.post("/api/v1/drops")
@@ -454,14 +588,17 @@ async def create_drop(req: CreateDropRequest, staff: dict = Depends(require_staf
         ident = conn.execute("SELECT cafe_slug FROM identity WHERE id = 'node_identity'").fetchone()
 
     slug = ident["cafe_slug"] if ident and ident["cafe_slug"] else "local"
-    tunnel_link = f"{CLOUDFLARE_TUNNEL_URL}/{slug}/d/{code}"
-    vanity_link = f"https://{VANITY_DOMAIN}/{slug}/d/{code}"
+    tunnel_link = f"{CLOUDFLARE_TUNNEL_URL}/{slug}/d/{code}/upload"
+    vanity_link = f"https://{VANITY_DOMAIN}/{slug}/d/{code}/upload"
     return {
         "drop_code": code,
         "portal_url": vanity_link,
         "vanity_url": vanity_link,
         "tunnel_url": tunnel_link,
-        "local_portal_url": f"/p/{code}",
+        "upload_tunnel_url": tunnel_link,
+        "upload_vanity_url": vanity_link,
+        "local_portal_url": f"/p/{code}/upload",
+        "qr_endpoint": f"/api/v1/drops/{code}/qr",
         "expires_at": expires_at,
         "max_bytes": req.max_bytes
     }
@@ -476,14 +613,36 @@ async def list_drops(staff: dict = Depends(require_staff)):
     return [
         {
             **dict(d),
-            "portal_url": f"https://{VANITY_DOMAIN}/{slug}/d/{d['code']}",
-            "vanity_url": f"https://{VANITY_DOMAIN}/{slug}/d/{d['code']}",
-            "tunnel_url": f"{CLOUDFLARE_TUNNEL_URL}/{slug}/d/{d['code']}",
-            "local_portal_url": f"/p/{d['code']}",
+            "portal_url": f"https://{VANITY_DOMAIN}/{slug}/d/{d['code']}/upload",
+            "vanity_url": f"https://{VANITY_DOMAIN}/{slug}/d/{d['code']}/upload",
+            "tunnel_url": f"{CLOUDFLARE_TUNNEL_URL}/{slug}/d/{d['code']}/upload",
+            "upload_tunnel_url": f"{CLOUDFLARE_TUNNEL_URL}/{slug}/d/{d['code']}/upload",
+            "upload_vanity_url": f"https://{VANITY_DOMAIN}/{slug}/d/{d['code']}/upload",
+            "local_portal_url": f"/p/{d['code']}/upload",
+            "qr_endpoint": f"/api/v1/drops/{d['code']}/qr",
             "is_expired": d["expires_at"] < time.time()
         }
         for d in drops
     ]
+
+@app.get("/api/v1/drops/{code}/qr")
+@app.get("/p/{code}/qr")
+@app.get("/{slug}/d/{code}/qr")
+@app.get("/{slug}/d/{code}/upload/qr")
+async def get_drop_qr_code(code: str, slug: Optional[str] = None):
+    conn = get_db()
+    drop = conn.execute("SELECT code, status, expires_at FROM drops WHERE code = ?", (code,)).fetchone()
+    ident = conn.execute("SELECT cafe_slug FROM identity WHERE id = 'node_identity'").fetchone()
+    conn.close()
+
+    if not drop or drop["status"] != "open" or drop["expires_at"] < time.time():
+        raise HTTPException(status_code=404, detail="Drop not found or expired")
+
+    cafe_slug = ident["cafe_slug"] if ident and ident["cafe_slug"] else "local"
+    upload_url = f"{CLOUDFLARE_TUNNEL_URL}/{cafe_slug}/d/{code}/upload"
+
+    svg_content = QRCodeGenerator(upload_url).generate_svg()
+    return Response(content=svg_content, media_type="image/svg+xml")
 
 @app.post("/api/v1/drops/{code}/close")
 async def close_drop(code: str, staff: dict = Depends(require_staff)):
@@ -495,23 +654,32 @@ async def close_drop(code: str, staff: dict = Depends(require_staff)):
 
 # --- Public Customer Portal Upload Endpoints ---
 
+@app.get("/upload", response_class=HTMLResponse)
 @app.get("/p/{code}")
+@app.get("/p/{code}/upload")
 @app.get("/{slug}/d/{code}")
-async def get_drop_info(code: str, request: Request, slug: Optional[str] = None):
+@app.get("/{slug}/d/{code}/upload")
+async def get_drop_info(request: Request, code: Optional[str] = None, slug: Optional[str] = None):
     """Customer opens drop link to view metadata or portal page."""
-    accept = request.headers.get("accept", "")
-    if ("text/html" in accept or "text/*" in accept or "*/*" in accept) and SERVER_HTML_FILE.exists() and "application/json" not in accept:
+    accept = request.headers.get("accept", "") if request else ""
+    if ("text/html" in accept or "text/*" in accept or "*/*" in accept or not accept) and SERVER_HTML_FILE.exists() and "application/json" not in accept:
         return HTMLResponse(SERVER_HTML_FILE.read_text(encoding="utf-8"))
 
     conn = get_db()
-    drop = conn.execute("SELECT code, label, max_bytes, expires_at, status FROM drops WHERE code = ?", (code,)).fetchone()
+    if not code:
+        drop = conn.execute("SELECT code, label, max_bytes, expires_at, status FROM drops WHERE status = 'open' AND expires_at > ? ORDER BY created_at DESC LIMIT 1", (time.time(),)).fetchone()
+    else:
+        drop = conn.execute("SELECT code, label, max_bytes, expires_at, status FROM drops WHERE code = ?", (code,)).fetchone()
     conn.close()
+
     if not drop or drop["status"] != "open" or drop["expires_at"] < time.time():
         raise HTTPException(status_code=404, detail="Drop not found or expired")
     return dict(drop)
 
 @app.post("/p/{code}/uploads")
+@app.post("/p/{code}/upload/uploads")
 @app.post("/{slug}/d/{code}/uploads")
+@app.post("/{slug}/d/{code}/upload/uploads")
 async def init_upload(code: str, req: InitUploadRequest, slug: Optional[str] = None):
     """Customer initiates chunked file upload."""
     conn = get_db()
@@ -546,7 +714,9 @@ async def init_upload(code: str, req: InitUploadRequest, slug: Optional[str] = N
     }
 
 @app.put("/p/{code}/uploads/{upload_id}/chunks/{idx}")
+@app.put("/p/{code}/upload/uploads/{upload_id}/chunks/{idx}")
 @app.put("/{slug}/d/{code}/uploads/{upload_id}/chunks/{idx}")
+@app.put("/{slug}/d/{code}/upload/uploads/{upload_id}/chunks/{idx}")
 async def upload_chunk(
     code: str,
     upload_id: str,
@@ -588,7 +758,9 @@ async def upload_chunk(
     return {"status": "chunk_accepted", "idx": idx}
 
 @app.post("/p/{code}/uploads/{upload_id}/complete")
+@app.post("/p/{code}/upload/uploads/{upload_id}/complete")
 @app.post("/{slug}/d/{code}/uploads/{upload_id}/complete")
+@app.post("/{slug}/d/{code}/upload/uploads/{upload_id}/complete")
 async def complete_upload(code: str, upload_id: str, req: CompleteUploadRequest, slug: Optional[str] = None):
     """Verifies all chunks, validates tree hash, issues Ed25519 receipt, and syncs to manager log."""
     conn = get_db()
@@ -675,7 +847,9 @@ async def complete_upload(code: str, upload_id: str, req: CompleteUploadRequest,
     }
 
 @app.get("/p/{code}/uploads/{upload_id}/receipt")
+@app.get("/p/{code}/upload/uploads/{upload_id}/receipt")
 @app.get("/{slug}/d/{code}/uploads/{upload_id}/receipt")
+@app.get("/{slug}/d/{code}/upload/uploads/{upload_id}/receipt")
 async def get_receipt(code: str, upload_id: str, slug: Optional[str] = None):
     conn = get_db()
     row = conn.execute("SELECT receipt_json, hub_sig, manager_ack_seq FROM receipts WHERE upload_id = ?", (upload_id,)).fetchone()

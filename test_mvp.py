@@ -598,6 +598,22 @@ async def test_ui_and_helper_endpoints(tmp_path):
         assert "text/html" in tunnel_html_res.headers["content-type"]
         assert "view-customer-portal" in tunnel_html_res.text
 
+        # 7b. Test Mobile /upload root path & QR code endpoint (while drop is open)
+        upload_html_res = await srv_client.get(f"/p/{drop_code}/upload", headers={"Accept": "text/html"})
+        assert upload_html_res.status_code == 200
+        assert "view-customer-portal" in upload_html_res.text
+
+        upload_slug_html = await srv_client.get(f"/mycafe1/d/{drop_code}/upload", headers={"Accept": "text/html"})
+        assert upload_slug_html.status_code == 200
+        assert "view-customer-portal" in upload_slug_html.text
+
+        # QR Code SVG Endpoint Test
+        qr_res = await srv_client.get(f"/api/v1/drops/{drop_code}/qr")
+        assert qr_res.status_code == 200
+        assert "image/svg+xml" in qr_res.headers["content-type"]
+        assert "<svg" in qr_res.text and "</svg>" in qr_res.text
+        assert "rect" in qr_res.text
+
         # 8. Test list sessions & obliteration
         sess_res = await srv_client.post("/api/v1/session/start", headers=headers)
         sess_id = sess_res.json()["session_id"]
